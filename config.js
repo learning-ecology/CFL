@@ -6,7 +6,7 @@
 //  "service_role" key here; that one bypasses all security.
 // ------------------------------------------------------------
 
-const SUPABASE_URL = "https://lqeetnlfqmarlqmbxusn.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_HLTiqXAPVp94_ot9i3yIFQ_nRlegnZ7";
+const SUPABASE_URL = "https://fsxzoaieagepzhmlgmzv.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_DTuaxipmZIHoLJOml-MoHg_T51AEJbx";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
