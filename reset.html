@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset password — Learning Ecology</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    /* apply dark mode before first paint: saved choice, else device preference */
+    try { var __t = localStorage.getItem("hub_theme");
+      if (__t === "dark" || (!__t && matchMedia("(prefers-color-scheme: dark)").matches))
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#17263e" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Learning Ecology" />
+</head>
+<body>
+  <main class="login-wrap">
+    <div style="width:100%; max-width:380px;">
+      <div style="text-align:center; margin-bottom:1.1rem;">
+        <img src="icons/icon-192.png" alt="Learning Ecology" width="60" height="60"
+             style="border-radius:14px; box-shadow:0 10px 26px -10px rgba(0,0,0,0.55);" />
+        <div style="color:#fff; font-family:var(--serif); font-size:1.35rem; font-weight:700; margin-top:0.55rem; text-shadow:0 2px 8px rgba(0,0,0,0.35);">Learning Ecology</div>
+      </div>
+    <div class="login-card">
+      <h1 data-i18n="reset_title">Set a new password</h1>
+      <p data-i18n="reset_sub" style="color:var(--muted); margin:0 0 1.5rem; font-size:0.9rem;">
+        Choose a new password for your account.
+      </p>
+
+      <div class="field">
+        <label for="pw1" data-i18n="new_pw">New password</label>
+        <input id="pw1" type="password" autocomplete="new-password" data-i18n-ph="ph_min8" />
+      </div>
+      <div class="field">
+        <label for="pw2" data-i18n="repeat_pw">Repeat new password</label>
+        <input id="pw2" type="password" autocomplete="new-password" data-i18n-ph="ph_same" />
+      </div>
+
+      <button id="save" data-i18n="save_new_pw" style="width:100%;">Save new password</button>
+      <p id="msg" class="msg"></p>
+      <p style="text-align:center; margin:1.1rem 0 0; border-top:1px solid var(--line); padding-top:0.9rem;">
+        <a href="#" id="lang-toggle" style="font-size:0.85rem; color:var(--muted);"></a>
+      </p>
+    </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="lang.js"></script>
+  <script src="config.js"></script>
+  <script>
+    applyI18n();
+    const langLink = document.getElementById("lang-toggle");
+    langLink.textContent = t("lang_name");
+    langLink.addEventListener("click", (e) => { e.preventDefault(); setLang(otherLang()); });
+
+    const msg = document.getElementById("msg");
+    let ready = false;
+
+    // When the user arrives from the email link, Supabase creates a
+    // temporary "recovery" session. We wait for it before allowing a save.
+    sb.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || session) ready = true;
+    });
+    sb.auth.getSession().then(({ data }) => { if (data.session) ready = true; });
+
+    document.getElementById("save").addEventListener("click", async () => {
+      const p1 = document.getElementById("pw1").value;
+      const p2 = document.getElementById("pw2").value;
+      msg.className = "msg";
+
+      if (p1.length < 8) { msg.textContent = t("err_min8"); msg.className = "msg err"; return; }
+      if (p1 !== p2)     { msg.textContent = t("err_mismatch"); msg.className = "msg err"; return; }
+      if (!ready) {
+        msg.textContent = t("err_need_link");
+        msg.className = "msg err";
+        return;
+      }
+
+      const { error } = await sb.auth.updateUser({ password: p1 });
+      if (error) { msg.textContent = t("err_save") + error.message; msg.className = "msg err"; return; }
+
+      msg.textContent = t("reset_ok");
+      setTimeout(() => (window.location.href = "dashboard.html"), 1200);
+    });
+  </script>
+  <script>
+    // PWA: offline shell + installability (needs HTTPS, e.g. GitHub Pages)
+    if ("serviceWorker" in navigator && location.protocol === "https:")
+      navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>

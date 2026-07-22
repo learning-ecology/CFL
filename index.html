@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Learning Ecology — Học tiếng Anh &amp; tiếng Trung theo lộ trình</title>
+  <meta name="description" content="Learning Ecology — nền tảng học tiếng Anh và tiếng Trung theo lộ trình cùng Thầy Lê Quốc Thông (Master of TESOL, IELTS 7.5, HSK 5). Theo dõi tiến độ, quiz, chứng nhận hoàn thành, học như ứng dụng trên điện thoại." />
+
+  <!-- social share preview (Zalo / Facebook / Messenger) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Learning Ecology — Học tiếng Anh & tiếng Trung theo lộ trình" />
+  <meta property="og:description" content="Học có lộ trình, tiến bộ đo được mỗi ngày — cùng Thầy Lê Quốc Thông (Master of TESOL, IELTS 7.5, HSK 5). Đăng ký học thử miễn phí." />
+  <meta property="og:url" content="https://learningecology.io.vn/" />
+  <!-- ?v=2 forces Zalo / Facebook to re-fetch the card instead of showing a cached copy -->
+  <meta property="og:image" content="https://learningecology.io.vn/social-card.png?v=2" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    /* apply dark mode before first paint: saved choice, else device preference */
+    try { var __t = localStorage.getItem("hub_theme");
+      if (__t === "dark" || (!__t && matchMedia("(prefers-color-scheme: dark)").matches))
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#17263e" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Learning Ecology" />
+
+  <style>
+    /* ---- landing-page styles (this page only) ---- */
+    .lp-header {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.7rem clamp(1rem, 4vw, 2.5rem);
+      background: rgba(23,38,62,0.94);
+      backdrop-filter: blur(6px);
+      color: #fff;
+    }
+    .lp-header img { width: 34px; height: 34px; border-radius: 8px; }
+    .lp-header .name { font-family: var(--serif); font-size: 1.15rem; font-weight: 700; flex: none; }
+
+    /* ---- section menu inside the sticky header ---- */
+    .lp-nav { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+    .lp-nav[hidden] { display: none; }
+    .lp-nav-toggle {
+      display: none; background: transparent; border: 1px solid rgba(255,255,255,.4);
+      color: #fff; border-radius: 8px; padding: .32rem .6rem; font-size: 1rem; cursor: pointer;
+      min-width: 44px; min-height: 44px; justify-content: center;   /* comfortable tap target */
+    }
+    .lp-nav-toggle:hover { background: rgba(255,255,255,.12); }
+    .lp-nav-list {
+      display: flex; gap: .1rem; list-style: none; margin: 0; padding: 0;
+      max-width: 100%; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .lp-nav-list::-webkit-scrollbar { display: none; }
+    .lp-nav-list a {
+      display: block; white-space: nowrap; text-decoration: none; color: #cfe0f5;
+      font-size: .86rem; font-weight: 600; padding: .38rem .62rem; border-radius: 8px;
+      transition: background .15s ease, color .15s ease;
+    }
+    .lp-nav-list a:hover { color: #fff; background: rgba(255,255,255,.12); }
+    .lp-nav-list a.on { color: #f4d68a; background: rgba(255,255,255,.14); }
+    @media (max-width: 900px) {
+      /* phones & small tablets: collapse into a hamburger dropdown */
+      .lp-nav { flex: 0 0 auto; justify-content: flex-end; margin-left: auto; }
+      .lp-nav-toggle { display: inline-flex; align-items: center; }
+      .lp-nav-list {
+        position: absolute; top: 100%; left: .75rem; right: .75rem;
+        flex-direction: column; gap: 0; overflow: hidden auto; max-height: 70vh;
+        background: #17263e; border: 1px solid rgba(255,255,255,.16);
+        border-radius: 12px; padding: .35rem; margin-top: .4rem; display: none;
+        box-shadow: 0 20px 44px -22px rgba(0,0,0,.7); z-index: 60;
+      }
+      .lp-nav.open .lp-nav-list { display: flex; }
+      .lp-nav-list a { padding: .6rem .7rem; font-size: .95rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { .lp-nav-list a { transition: none; } }
+    /* direct #hash links must not land under the sticky header */
+    #lp-main > section { scroll-margin-top: 72px; }
+    .lp-hero {
+      /* translucent so the background artwork shows through, but kept dense
+         enough that white/pale-blue hero text stays above 4.5:1 contrast
+         even where the artwork behind is at its brightest (ivory) */
+      background: linear-gradient(135deg, rgba(30,79,143,.91), rgba(19,39,67,.95));
+      color: #fff;
+      padding: clamp(3rem, 9vw, 5.5rem) 1.25rem clamp(3.2rem, 9vw, 6rem);
+      text-align: center;
+    }
+    .lp-hero h1 {
+      font-size: clamp(1.9rem, 5.4vw, 3.1rem);
+      margin: 0 auto 0.8rem; max-width: 820px; line-height: 1.22;
+    }
+    .lp-hero .sub {
+      color: #dbe6f5; font-size: clamp(0.98rem, 2.4vw, 1.15rem);
+      max-width: 640px; margin: 0 auto 1.6rem;
+    }
+    .lp-cta { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; }
+    .lp-cta .gold {
+      background: linear-gradient(135deg, #f4d68a, #d9a53c);
+      border-color: #d9a53c; color: #132743; font-weight: 800;
+    }
+    .lp-cta .gold:hover { background: linear-gradient(135deg, #f8e0a5, #e0b055); }
+    .lp-cta a { text-decoration: none; }
+    .lp-chips { display: flex; gap: 0.5rem 1.4rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem; }
+    .lp-chips span { font-size: 0.86rem; color: #cfe0f5; font-weight: 600; }
+    .lp-section { max-width: 980px; margin: 0 auto; padding: clamp(2.4rem, 7vw, 4rem) 1.25rem; }
+    .lp-section > h2 {
+      font-size: clamp(1.4rem, 3.6vw, 1.9rem); text-align: center; margin-bottom: 0.4rem;
+    }
+    .lp-section > .lead { text-align: center; color: var(--muted); margin: 0 auto 2rem; max-width: 560px; }
+    .lp-quote {
+      background: #fbf7ec; border-top: 1px solid #eadfc4; border-bottom: 1px solid #eadfc4;
+      text-align: center; padding: clamp(2.4rem, 7vw, 3.6rem) 1.25rem;
+    }
+    [data-theme="dark"] .lp-quote { background: #1c2536; border-color: #2c3850; }
+    .lp-quote .vi {
+      font-family: var(--serif); font-style: italic; font-weight: 700;
+      font-size: clamp(1.3rem, 3.8vw, 1.9rem); color: #8a5f27; max-width: 760px; margin: 0 auto;
+    }
+    [data-theme="dark"] .lp-quote .vi { color: #e3b95c; }
+    .lp-quote .en { margin-top: 0.9rem; font-size: clamp(0.95rem, 2.4vw, 1.1rem); color: var(--muted); font-style: italic; }
+    .lp-quote .zh { margin-top: 0.45rem; font-size: clamp(1rem, 2.6vw, 1.2rem); color: var(--ink); }
+    .lp-teacher {
+      display: flex; gap: clamp(1.2rem, 4vw, 2.5rem); align-items: center; flex-wrap: wrap;
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+      padding: clamp(1.2rem, 4vw, 2rem);
+      box-shadow: 0 14px 40px -24px rgba(23,38,62,0.35);
+    }
+    .lp-teacher .photo, .lp-teacher .photo-fb {
+      width: min(240px, 60vw); border-radius: 14px; flex: none; margin: 0 auto;
+    }
+    .lp-teacher .photo { display: block; object-fit: cover; object-position: 50% 18%; aspect-ratio: 4/5; }
+    .lp-teacher .photo-fb {
+      display: none; aspect-ratio: 4/5; place-items: center;
+      background: linear-gradient(135deg, #1e4f8f, #132743);
+      color: #e3b95c; font-family: var(--serif); font-size: 4rem; font-weight: 700;
+    }
+    .lp-teacher .info { flex: 1; min-width: 260px; }
+    .lp-teacher h3 { font-family: var(--serif); font-size: 1.45rem; margin: 0 0 0.2rem; }
+    .lp-feat { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.9rem; }
+    .lp-feat .f {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 1rem 1.1rem; font-size: 0.94rem;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .lp-feat .f:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -18px rgba(23,38,62,0.4); }
+    .lp-feat .f b { display: block; margin-bottom: 0.2rem; }
+    .lp-contact {
+      background: linear-gradient(135deg, #1e4f8f, #132743); color: #fff;
+      border-radius: 18px; padding: clamp(1.6rem, 5vw, 2.6rem);
+      display: flex; gap: 2rem; align-items: center; flex-wrap: wrap;
+    }
+    .lp-contact .qr { flex: none; text-align: center; margin: 0 auto; }
+    .lp-contact .qr img { border-radius: 10px; border: 4px solid #fff; }
+    .lp-contact .qr .kind { color: #cfe0f5; display: block; margin-top: 0.4rem; }
+    .lp-contact h2 { font-size: 1.5rem; margin: 0 0 0.4rem; }
+    .lp-contact p { color: #dbe6f5; margin: 0 0 1.1rem; }
+    .lp-contact a.btn { text-decoration: none; display: inline-block; margin: 0 0.5rem 0.5rem 0; }
+    .lp-contact a.zalo { background: #fff; border-color: #fff; color: #132743; }
+    .lp-contact a.zalo:hover { background: #e9eef7; }
+    .lp-contact a.fb { background: transparent; border-color: rgba(255,255,255,0.55); }
+    .lp-footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 2rem 1rem 2.6rem; }
+    .lp-footer a { color: var(--accent-ink); }
+
+    /* ============ new: shared bits ============ */
+    .btn, .lpx-btn { transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid #4f8fdd; outline-offset: 2px; border-radius: 6px;
+    }
+    .lpx-badge {
+      display: inline-block; background: linear-gradient(135deg, #f4d68a, #d9a53c);
+      color: #5d3a06; font-weight: 800; font-size: 0.78rem; border-radius: 999px;
+      padding: 0.25rem 0.85rem; margin-bottom: 0.7rem; letter-spacing: 0.02em;
+    }
+    .lpx-soon {
+      display: inline-block; border: 1px dashed var(--line); color: var(--muted);
+      border-radius: 10px; padding: 0.55rem 1.1rem; font-weight: 600; font-size: 0.92rem;
+      cursor: not-allowed; user-select: none;
+    }
+    .lpx-skel { border-radius: 12px; background: var(--line); position: relative; overflow: hidden; min-height: 120px; }
+    .lpx-skel::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+      animation: lpxshine 1.4s infinite;
+    }
+    @keyframes lpxshine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+    .lpx-draft {
+      position: absolute; top: 8px; left: 8px; z-index: 3; background: #c05600; color: #fff;
+      font-size: 0.7rem; font-weight: 800; border-radius: 6px; padding: 2px 8px;
+    }
+    .lpx-ph { /* branded placeholder for missing images */
+      display: grid; place-items: center; width: 100%; height: 100%;
+      background: linear-gradient(135deg, #1e4f8f, #132743); color: #e3b95c;
+      font-family: var(--serif); font-weight: 700; text-align: center; padding: 0.6rem;
+    }
+    .lpx-ph small { color: #cfe0f5; font-family: inherit; }
+
+    /* ============ new: Học thử miễn phí ============ */
+    .lpx-trial {
+      background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+      padding: clamp(1.4rem, 4.5vw, 2.4rem); text-align: center;
+      box-shadow: 0 18px 50px -30px rgba(23,38,62,0.45);
+      background-size: cover; background-position: center; position: relative; overflow: hidden;
+    }
+    .lpx-trial.hasimg::before { content: ""; position: absolute; inset: 0; background: rgba(19,39,67,0.78); }
+    .lpx-trial.hasimg, .lpx-trial.hasimg h2 { color: #fff; }
+    .lpx-trial.hasimg .lead { color: #dbe6f5; }
+    .lpx-trial > * { position: relative; }
+    .lpx-trial h2 { font-size: clamp(1.45rem, 3.8vw, 2rem); margin: 0 0 0.4rem; }
+    .lpx-trial .lead { color: var(--muted); max-width: 620px; margin: 0 auto 1.2rem; }
+    .lpx-trial .ctas { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; margin-bottom: 0.4rem; }
+    .lpx-trial .ctas .btn { text-decoration: none; }
+    .lpx-trial .ctas .gold {
+      background: linear-gradient(135deg, #f4d68a, #d9a53c); border-color: #d9a53c;
+      color: #132743; font-weight: 800;
+    }
+    /* transformed carousel cards must never widen the page:
+       clip at the main container (clip > hidden: no scroll container) */
+    #lp-main { overflow-x: hidden; overflow-x: clip; }
+
+    /* ---- trial 3D cover-flow carousel ---- */
+    .lpx-tflow { position: relative; margin-top: 1.7rem; }
+    .lpx-tstage {
+      position: relative; height: 384px; margin: 0 auto; max-width: 900px;
+      perspective: 1200px; outline: none; touch-action: pan-y;
+    }
+    .lpx-trc {
+      position: absolute; top: 0; left: 50%; width: min(340px, 76vw);
+      margin-left: calc(min(340px, 76vw) / -2); height: 100%;
+      background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+      display: flex; flex-direction: column; text-align: left; cursor: pointer;
+      box-shadow: 0 10px 26px -18px rgba(23,38,62,0.4);
+      transition: transform 0.5s cubic-bezier(.22,.8,.3,1), opacity 0.5s ease, box-shadow 0.25s ease;
+      will-change: transform;
+    }
+    .lpx-trc.on { cursor: default; box-shadow: 0 30px 70px -28px rgba(23,38,62,0.65); }
+    .lpx-trc.on:hover { box-shadow: 0 34px 78px -28px rgba(23,38,62,0.72); }
+    .lpx-trc:not(.on):hover { box-shadow: 0 16px 40px -20px rgba(23,38,62,0.55); }
+    .lpx-trc[aria-hidden="true"] { pointer-events: none; }
+    .lpx-trc .thumb { aspect-ratio: 16/9; overflow: hidden; position: relative; flex: none; background: #132743; }
+    .lpx-trc .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .lpx-trc .tb { padding: 0.85rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.3rem; flex: 1; min-height: 0; }
+    .lpx-trc .cat { font-size: 0.74rem; font-weight: 800; color: var(--accent-ink); text-transform: uppercase; letter-spacing: 0.04em; }
+    .lpx-trc h3 { margin: 0; font-size: 1.06rem; font-family: var(--serif); }
+    .lpx-trc p { margin: 0; color: var(--muted); font-size: 0.9rem; flex: 1;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .lpx-trc .act { margin-top: 0.55rem; }
+    .lpx-trc .act .btn { text-decoration: none; display: inline-block; }
+    /* side cards never receive accidental CTA clicks — the card itself activates */
+    .lpx-trc:not(.on) .act a, .lpx-trc:not(.on) .act .lpx-soon { pointer-events: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+               overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    @media (max-width: 900px) { .lpx-tstage { height: 372px; } }
+
+    /* ============ teaching-team 3D carousel ============
+       Reuses the existing .lp-teacher card verbatim — the carousel only
+       positions it in 3D, so the premium card design is untouched. */
+    .tf-wrap { position: relative; }
+    .tf-stage {
+      position: relative; height: 430px; perspective: 1400px;
+      outline: none; touch-action: pan-y; cursor: grab;
+    }
+    .tf-stage.drag { cursor: grabbing; }
+    .tf-card {
+      position: absolute; top: 0; left: 50%;
+      width: min(760px, 90vw); margin-left: calc(min(760px, 90vw) / -2); height: 100%;
+      transition: transform .5s cubic-bezier(.22,.8,.3,1), opacity .5s ease;
+      will-change: transform;
+    }
+    .tf-card[aria-hidden="true"] { pointer-events: none; }
+    .tf-card .lp-teacher { height: 100%; margin: 0; overflow: hidden; }
+    .tf-card:not(.on) .lp-teacher { box-shadow: 0 10px 26px -18px rgba(23,38,62,.4); }
+    .tf-card.on .lp-teacher { box-shadow: 0 30px 70px -28px rgba(23,38,62,.6); }
+    /* side cards must never steal a click meant for the active card */
+    .tf-card:not(.on) a { pointer-events: none; }
+    /* keep the original 260px wrap threshold (so the text column drops below
+       the portrait on phones) but never let it exceed a narrow card */
+    .tf-card .info { min-width: min(260px, 100%); }
+    /* keeps every card the same height however long the biography is */
+    .tf-bio {
+      font-size: .95rem; margin: 0 0 1rem;
+      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .tf-links { display: flex; flex-wrap: wrap; gap: .5rem; }
+    /* buttons wrap to a new line instead of being squeezed thin on phones */
+    .tf-links a { text-decoration: none; display: inline-block; flex: 0 0 auto; max-width: 100%; }
+    @media (max-width: 900px) { .tf-stage { height: 470px; } }
+    @media (max-width: 640px) {
+      .tf-stage { height: 640px; }
+      .tf-card { width: 92vw; margin-left: -46vw; }
+      .tf-bio { -webkit-line-clamp: 5; }
+    }
+
+    /* ============ new: course cover-flow carousel ============ */
+    .lpx-cwrap { position: relative; }
+    .lpx-stage {
+      position: relative; height: clamp(240px, 44vw, 330px); margin: 0 auto;
+      perspective: 1100px; outline: none; touch-action: pan-y;
+    }
+    .lpx-card {
+      position: absolute; top: 0; left: 50%; width: min(420px, 78vw);
+      margin-left: calc(min(420px, 78vw) / -2);
+      border-radius: 16px; overflow: hidden; background: var(--card);
+      border: 1px solid var(--line); box-shadow: 0 24px 60px -30px rgba(23,38,62,0.55);
+      transition: transform 0.45s cubic-bezier(.22,.8,.3,1), opacity 0.45s ease, filter 0.45s ease;
+      cursor: pointer; will-change: transform;
+    }
+    .lpx-card .cov { aspect-ratio: 16/9; position: relative; background: #132743; }
+    .lpx-card .cov img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .lpx-card .strip {
+      padding: 0.7rem 1rem; display: flex; align-items: center; gap: 0.5rem; justify-content: space-between;
+    }
+    .lpx-card .strip h3 { margin: 0; font-family: var(--serif); font-size: 1.02rem; }
+    .lpx-card .strip .tag { font-size: 0.72rem; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+    .lpx-card[aria-hidden="true"] { pointer-events: none; }
+    .lpx-nav {
+      display: flex; align-items: center; justify-content: center; gap: 0.9rem; margin-top: 1.1rem;
+    }
+    .lpx-nav button {
+      width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line);
+      background: var(--card); color: var(--ink); font-size: 1.05rem; cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .lpx-nav button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -12px rgba(23,38,62,0.5); }
+    .lpx-dots { display: flex; gap: 0.45rem; }
+    .lpx-dots button {
+      width: 10px; height: 10px; min-height: 10px; max-height: 10px; min-width: 10px;
+      padding: 0; line-height: 0; font-size: 0; flex: none;
+      border-radius: 50%; border: 1px solid var(--line);
+      background: var(--line); cursor: pointer; transition: background 0.2s, transform 0.2s;
+    }
+    .lpx-dots button.on { background: var(--accent-ink); transform: scale(1.25); border-color: var(--accent-ink); }
+    .lpx-info {
+      max-width: 760px; margin: 1.6rem auto 0; background: var(--card); border: 1px solid var(--line);
+      border-radius: 16px; padding: clamp(1.1rem, 3.5vw, 1.8rem);
+      opacity: 1; transform: none; transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .lpx-info.swap { opacity: 0; transform: translateY(8px); }
+    .lpx-info h3 { margin: 0 0 0.2rem; font-family: var(--serif); font-size: 1.3rem; }
+    .lpx-info .tagline { color: var(--accent-ink); font-weight: 600; margin: 0 0 0.7rem; }
+    .lpx-info .meta { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0 0 0.8rem; font-size: 0.85rem; color: var(--muted); }
+    .lpx-info .meta b { color: var(--ink); }
+    .lpx-info .desc { margin: 0 0 0.8rem; font-size: 0.95rem; }
+    .lpx-info ul { margin: 0 0 0.9rem; padding-left: 1.2rem; font-size: 0.92rem; }
+    .lpx-info ul li { margin-bottom: 0.2rem; }
+    .lpx-info .price { font-weight: 800; color: var(--accent-ink); margin: 0 0 0.9rem; }
+    .lpx-info .ctas { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .lpx-info .ctas .btn { text-decoration: none; }
+    .lpx-info .ctas .gold {
+      background: linear-gradient(135deg, #f4d68a, #d9a53c); border-color: #d9a53c;
+      color: #132743; font-weight: 800;
+    }
+
+    /* ============ new: achievements / feedback / gallery ============ */
+    .lpx-filters { display: flex; gap: 0.45rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.3rem; }
+    .lpx-filters button {
+      border: 1px solid var(--line); background: var(--card); color: var(--ink);
+      border-radius: 999px; padding: 0.4rem 0.95rem; font-size: 0.86rem; cursor: pointer;
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+    }
+    .lpx-filters button:hover { transform: translateY(-1px); }
+    .lpx-filters button.on { background: var(--accent-ink); border-color: var(--accent-ink); color: #fff; font-weight: 700; }
+    .lpx-atrack {
+      display: flex; gap: 1rem; overflow-x: auto; scroll-snap-type: x mandatory;
+      padding: 0.3rem 0.2rem 1rem; scrollbar-width: thin; outline: none;
+    }
+    .lpx-acard {
+      flex: 0 0 min(300px, 82vw); scroll-snap-align: center; position: relative;
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+      transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: pointer;
+    }
+    .lpx-acard:hover { transform: translateY(-4px); box-shadow: 0 18px 38px -18px rgba(23,38,62,0.4); }
+    .lpx-acard .im { aspect-ratio: 4/3; background: var(--line); position: relative; overflow: hidden; }
+    .lpx-acard .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .lpx-acard .ab { padding: 0.8rem 0.95rem 1rem; }
+    .lpx-acard .cat { font-size: 0.72rem; font-weight: 800; color: var(--accent-ink); text-transform: uppercase; letter-spacing: 0.04em; }
+    .lpx-acard h3 { margin: 0.2rem 0 0.25rem; font-size: 1rem; font-family: var(--serif); }
+    .lpx-acard p { margin: 0; color: var(--muted); font-size: 0.87rem; }
+    .lpx-acard .fbtext { font-size: 0.92rem; color: var(--ink); font-style: italic; }
+    .lpx-acard .who { margin-top: 0.55rem; font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+
+    /* lightbox */
+    .lpx-lb {
+      position: fixed; inset: 0; z-index: 300; background: rgba(10,16,28,0.9);
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .lpx-lb.open { display: flex; }
+    .lpx-lb figure { margin: 0; max-width: min(960px, 94vw); max-height: 92vh; display: flex; flex-direction: column; }
+    .lpx-lb img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 10px; background: #0a101c; }
+    .lpx-lb figcaption { color: #dbe6f5; text-align: center; padding: 0.7rem 0.5rem 0; font-size: 0.92rem; }
+    .lpx-lb .x {
+      position: absolute; top: 14px; right: 16px; width: 42px; height: 42px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); color: #fff;
+      font-size: 1.1rem; cursor: pointer;
+    }
+    .lpx-lb .pn {
+      position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px;
+      border-radius: 50%; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.08);
+      color: #fff; font-size: 1.1rem; cursor: pointer;
+    }
+    .lpx-lb .prev { left: 14px; } .lpx-lb .next { right: 14px; }
+
+    /* ============ animated brand background (decorative only) ============
+       A fixed, non-interactive stack behind the page: the static photo,
+       slow-drifting pale-blue waves, two gently swaying leaf sprigs and a
+       few warm-gold motes in the corners. Only transform/opacity animate.  */
+    html { background: var(--paper); }
+    body { background: transparent; }
+    #lpBg {
+      position: fixed; inset: 0; z-index: -1;
+      overflow: hidden; pointer-events: none;
+    }
+    #lpBg > * { position: absolute; inset: 0; }
+    /* brand-coloured base — also the fallback when landing-bg.jpg is absent */
+    .bgx-base {
+      background:
+        radial-gradient(115% 85% at 0% 0%, #17325c 0%, #2c5490 10%, rgba(176,199,231,.5) 30%, rgba(244,246,250,0) 52%),
+        radial-gradient(115% 85% at 100% 100%, #17325c 0%, #2c5490 10%, rgba(176,199,231,.5) 30%, rgba(244,246,250,0) 52%),
+        linear-gradient(155deg, #fcfbf7 0%, #f5f7fb 48%, #eef2f9 100%);
+    }
+    .bgx-photo { background: url("landing-bg.jpg") center / cover no-repeat; }
+    /* keeps the middle bright so headings and cards stay readable */
+    .bgx-veil { background: radial-gradient(closest-side at 50% 42%, rgba(255,255,255,.5), rgba(255,255,255,0) 78%); }
+    [data-theme="dark"] #lpBg { opacity: .3; }
+    [data-theme="dark"] .bgx-veil { display: none; }
+
+    /* parallax wrappers: only these translate, so they never fight the
+       keyframe transforms running on the artwork inside them */
+    .bgx-p {
+      transform: translate3d(calc(var(--mx, 0) * var(--d, 0) * 1px),
+                             calc(var(--my, 0) * var(--d, 0) * 1px), 0);
+      transition: transform .8s cubic-bezier(.22,.8,.3,1);
+      will-change: transform;
+    }
+    /* pale-blue waves — extremely slow diagonal drift */
+    .bgx-waves { width: 118%; height: 100%; left: -9%; }
+    .bgx-waves path { fill: none; stroke-linecap: round; }
+    .wv1 { stroke: rgba(120,158,208,.20); stroke-width: 42;
+           animation: bgxDrift 68s ease-in-out infinite alternate; }
+    .wv2 { stroke: rgba(163,190,225,.16); stroke-width: 26;
+           animation: bgxDrift 92s -12s ease-in-out infinite alternate-reverse; }
+    @keyframes bgxDrift {
+      from { transform: translate3d(-1.6%, .6%, 0); }
+      to   { transform: translate3d(1.6%, -.6%, 0); }
+    }
+    /* leaf sprigs: each group sways on its own clock so it reads as breeze */
+    .bgx-sprig { position: absolute; width: clamp(210px, 33vw, 460px); height: auto; }
+    .bgx-tl { top: -2%; left: -2%; }
+    .bgx-br { bottom: -3%; right: -2%; transform: scale(-1); }
+    .bgx-sprig .stem { fill: none; stroke: rgba(201,151,58,.40); stroke-width: 1.6; }
+    .bgx-sprig .sw { transform-box: fill-box; transform-origin: 2% 62%; }
+    .sw-a { animation: bgxSway 9s   ease-in-out infinite alternate; }
+    .sw-b { animation: bgxSway 7.4s -1.8s ease-in-out infinite alternate-reverse; }
+    .sw-c { animation: bgxSway 10.6s -3.2s ease-in-out infinite alternate; }
+    @keyframes bgxSway { from { transform: rotate(-1.1deg); } to { transform: rotate(1.5deg); } }
+
+    /* warm-gold motes, corners only — never over headings or cards */
+    .bgx-dust i {
+      position: absolute; left: var(--x); top: var(--y);
+      width: 5px; height: 5px; border-radius: 50%; opacity: 0;
+      background: radial-gradient(circle, rgba(233,200,119,.95), rgba(233,200,119,0) 70%);
+      animation: bgxFloat var(--t) var(--dl) ease-in-out infinite;
+    }
+    @keyframes bgxFloat {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(.85); opacity: 0; }
+      25%  { opacity: .45; }
+      50%  { transform: translate3d(4px, -30px, 0) scale(1.08); opacity: .7; }
+      75%  { opacity: .3; }
+    }
+
+    @media (max-width: 640px) {
+      /* phones: keep the artwork, drop the motion */
+      .bgx-dust { display: none; }
+      .bgx-sprig .sw, .bgx-waves path { animation: none; }
+      .bgx-sprig { width: 46vw; }
+      .lpx-stage { height: clamp(230px, 66vw, 300px); }
+      .lpx-card { width: 84vw; margin-left: -42vw; }
+      .lpx-tstage { height: calc(44vw + 210px); }
+      .lpx-trc { width: 78vw; margin-left: -39vw; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .lpx-card, .lpx-info, .lpx-trc, .tf-card, .lpx-acard, .btn, .lp-feat .f { transition: none !important; }
+      .lpx-skel::after { animation: none; }
+      /* static background only: artwork stays, every motion stops */
+      #lpBg .sw, #lpBg path, #lpBg .bgx-dust i { animation: none !important; }
+      .bgx-p { transform: none !important; transition: none !important; }
+      .bgx-dust { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ decorative animated background ============
+       Purely visual: aria-hidden, pointer-events:none, sits behind
+       everything at z-index:-1 and cannot cause horizontal scrolling. -->
+  <div id="lpBg" aria-hidden="true">
+    <div class="bgx-base"></div>
+    <div class="bgx-photo"></div>
+    <div class="bgx-veil"></div>
+
+    <div class="bgx-p" style="--d:4">
+      <svg class="bgx-waves" viewBox="0 0 1600 900" preserveAspectRatio="none" focusable="false">
+        <path class="wv1" d="M-120 300 C 300 190, 690 385, 1090 258 S 1500 172, 1760 236" />
+        <path class="wv2" d="M-120 645 C 250 725, 620 558, 985 662 S 1455 762, 1760 690" />
+      </svg>
+    </div>
+
+    <div class="bgx-p" style="--d:9">
+      <svg class="bgx-sprig bgx-tl" viewBox="0 0 420 330" focusable="false">
+        <defs>
+          <linearGradient id="bgGold1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#f0d9a0" /><stop offset="1" stop-color="#c9973a" />
+          </linearGradient>
+          <linearGradient id="bgNavy1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#a8bcda" /><stop offset="1" stop-color="#4a6fa5" />
+          </linearGradient>
+          <path id="bgLeaf1" d="M0 0C10-12 30-14 42 0C30 14 10 12 0 0Z" />
+        </defs>
+        <path class="stem" d="M-8 28 C 88 54, 164 44, 234 120" />
+        <g class="sw sw-a" opacity=".85">
+          <use href="#bgLeaf1" fill="url(#bgGold1)" transform="translate(24 30) rotate(-40)" />
+          <use href="#bgLeaf1" fill="url(#bgNavy1)" transform="translate(44 44) rotate(24) scale(.9)" />
+          <use href="#bgLeaf1" fill="url(#bgGold1)" transform="translate(76 44) rotate(-16) scale(1.1)" />
+        </g>
+        <g class="sw sw-b" opacity=".8">
+          <use href="#bgLeaf1" fill="url(#bgNavy1)" transform="translate(114 50) rotate(-44)" />
+          <use href="#bgLeaf1" fill="url(#bgGold1)" transform="translate(134 58) rotate(16) scale(1.15)" />
+          <use href="#bgLeaf1" fill="url(#bgGold1)" transform="translate(163 66) rotate(-26) scale(.95)" />
+        </g>
+        <g class="sw sw-c" opacity=".75">
+          <use href="#bgLeaf1" fill="url(#bgGold1)" transform="translate(198 92) rotate(-30)" />
+          <use href="#bgLeaf1" fill="url(#bgNavy1)" transform="translate(214 106) rotate(32) scale(.9)" />
+        </g>
+      </svg>
+    </div>
+
+    <div class="bgx-p" style="--d:12">
+      <svg class="bgx-sprig bgx-br" viewBox="0 0 420 330" focusable="false">
+        <defs>
+          <linearGradient id="bgGold2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#f0d9a0" /><stop offset="1" stop-color="#c9973a" />
+          </linearGradient>
+          <linearGradient id="bgNavy2" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#a8bcda" /><stop offset="1" stop-color="#4a6fa5" />
+          </linearGradient>
+          <path id="bgLeaf2" d="M0 0C10-12 30-14 42 0C30 14 10 12 0 0Z" />
+        </defs>
+        <path class="stem" d="M-8 34 C 96 60, 172 48, 240 126" />
+        <g class="sw sw-b" opacity=".85">
+          <use href="#bgLeaf2" fill="url(#bgGold2)" transform="translate(30 36) rotate(-34)" />
+          <use href="#bgLeaf2" fill="url(#bgNavy2)" transform="translate(52 48) rotate(28) scale(.92)" />
+          <use href="#bgLeaf2" fill="url(#bgGold2)" transform="translate(84 50) rotate(-18) scale(1.08)" />
+        </g>
+        <g class="sw sw-c" opacity=".8">
+          <use href="#bgLeaf2" fill="url(#bgGold2)" transform="translate(122 56) rotate(-40) scale(1.05)" />
+          <use href="#bgLeaf2" fill="url(#bgNavy2)" transform="translate(146 64) rotate(18)" />
+          <use href="#bgLeaf2" fill="url(#bgGold2)" transform="translate(174 74) rotate(-22) scale(.95)" />
+        </g>
+        <g class="sw sw-a" opacity=".7">
+          <use href="#bgLeaf2" fill="url(#bgGold2)" transform="translate(206 98) rotate(-28) scale(1.05)" />
+          <use href="#bgLeaf2" fill="url(#bgNavy2)" transform="translate(222 112) rotate(34) scale(.88)" />
+        </g>
+      </svg>
+    </div>
+
+    <div class="bgx-p" style="--d:6">
+      <div class="bgx-dust">
+        <i style="--x:5%;  --y:16%; --t:17s; --dl:0s"></i>
+        <i style="--x:11%; --y:29%; --t:21s; --dl:-6s"></i>
+        <i style="--x:16%; --y:9%;  --t:15s; --dl:-11s"></i>
+        <i style="--x:3%;  --y:44%; --t:23s; --dl:-3s"></i>
+        <i style="--x:90%; --y:74%; --t:19s; --dl:-8s"></i>
+        <i style="--x:95%; --y:88%; --t:16s; --dl:-2s"></i>
+        <i style="--x:84%; --y:93%; --t:22s; --dl:-13s"></i>
+        <i style="--x:97%; --y:58%; --t:18s; --dl:-5s"></i>
+      </div>
+    </div>
+  </div>
+
+  <header class="lp-header">
+    <img src="icons/icon-192.png" alt="Learning Ecology" />
+    <span class="name">Learning Ecology</span>
+
+    <!-- section menu: built from the sections actually visible on the page,
+         so it follows any rename / hide / reorder made in the dashboard -->
+    <nav class="lp-nav" id="lpNav" aria-label="Mục trên trang" hidden>
+      <button class="lp-nav-toggle" id="lpNavToggle" aria-expanded="false" aria-controls="lpNavList">
+        <span aria-hidden="true">☰</span><span class="sr-only">Mở menu mục trên trang</span>
+      </button>
+      <ul class="lp-nav-list" id="lpNavList"></ul>
+    </nav>
+
+    <button id="lp-theme" class="ghost theme-btn" aria-label="Light / dark mode"
+            style="color:#fff; border-color:rgba(255,255,255,0.4); margin-right:0.4rem;">🌙</button>
+    <a id="hd-login" class="btn ghost" href="login.html"
+       style="text-decoration:none; color:#fff; border-color:rgba(255,255,255,0.4);">Đăng nhập</a>
+  </header>
+
+  <!-- ================= HERO ================= -->
+  <section class="lp-hero">
+    <h1 id="heroTitle">Học tiếng Anh &amp; tiếng Trung theo lộ trình,<br />tiến bộ đo được mỗi ngày</h1>
+    <p class="sub" id="heroSub">Lớp học trực tuyến của Thầy Lê Quốc Thông — mỗi bài học nằm trong một lộ trình rõ ràng,
+      có quiz, bài tập, theo dõi thời gian học và chứng nhận khi hoàn thành khóa.</p>
+    <div class="lp-cta" id="heroCta">
+      <a id="hero-start" class="btn gold" href="login.html">Bắt đầu học →</a>
+      <a class="btn ghost" href="#hoc-thu" data-hit="cta-trial" style="color:#fff; border-color:rgba(255,255,255,0.5);">Học thử miễn phí</a>
+    </div>
+    <div class="lp-chips" id="heroChips">
+      <span>🀄 Tiếng Trung HSK 3.0</span>
+      <span>🎓 IELTS · VSTEP</span>
+      <span>📊 Theo dõi tiến độ</span>
+      <span>📲 Học như ứng dụng trên điện thoại</span>
+    </div>
+  </section>
+
+  <!-- Sections below are reordered / hidden by the owner's Landing Page settings -->
+  <main id="lp-main">
+
+    <!-- ================= HỌC THỬ MIỄN PHÍ (dynamic) ================= -->
+    <section class="lp-section" data-sec="trial" id="hoc-thu">
+      <div id="trialBox"><div class="lpx-skel" style="min-height:180px;" aria-hidden="true"></div></div>
+    </section>
+
+    <!-- ================= COURSE CAROUSEL (dynamic) ================= -->
+    <section class="lp-section" data-sec="courses" id="khoa-hoc" style="padding-top:0;">
+      <h2 id="coursesTitle">Các khóa học</h2>
+      <p class="lead" id="coursesLead">Chọn một khóa để xem lộ trình, nội dung và cách đăng ký.</p>
+      <div id="courseBox"><div class="lpx-skel" style="min-height:260px;" aria-hidden="true"></div></div>
+    </section>
+
+    <!-- ================= TEACHER ================= -->
+    <section class="lp-section" data-sec="teacher" id="giao-vien" style="padding-top:0;" hidden>
+      <h2 id="tchTitle">Đội ngũ giáo viên</h2>
+      <p class="lead" id="tchLead">Những người trực tiếp thiết kế, giảng dạy và đồng hành trong toàn bộ lộ trình.</p>
+      <div id="teacherBox"></div>
+    </section>
+
+    <!-- ================= ACHIEVEMENTS & FEEDBACK (dynamic) ================= -->
+    <section class="lp-section" data-sec="achieve" id="thanh-tuu" style="padding-top:0;" hidden>
+      <h2 id="achTitle">Thành tựu &amp; Cảm nhận của học viên</h2>
+      <p class="lead" id="achLead">Chứng chỉ, kết quả và phản hồi thật từ lớp học.</p>
+      <div id="achBox"></div>
+    </section>
+
+    <!-- ================= FEATURES ================= -->
+    <section class="lp-section" data-sec="feats" id="tinh-nang" style="padding-top:0;">
+      <h2>Học trên nền tảng hiện đại</h2>
+      <p class="lead">Không chỉ là tài liệu — cả lớp học được số hóa.</p>
+      <div class="lp-feat">
+        <div class="f"><b>🗺️ Lộ trình rõ ràng</b>Mỗi khóa là một chuỗi bài học theo thứ tự, biết rõ bài tiếp theo cần học.</div>
+        <div class="f"><b>📊 Tiến độ &amp; chuỗi ngày học</b>Thời gian học, điểm quiz, huy hiệu và chuỗi ngày học liên tục — như Duolingo.</div>
+        <div class="f"><b>📝 Quiz &amp; bài tập có chấm</b>Làm bài ngay trên nền tảng, giáo viên chấm và nhận xét từng bài.</div>
+        <div class="f"><b>🎓 Chứng nhận hoàn thành</b>Hoàn thành 100% khóa học nhận chứng nhận mang tên bạn, in được ra giấy.</div>
+        <div class="f"><b>📲 Như một ứng dụng</b>Cài lên màn hình chính điện thoại, mở toàn màn hình, không cần App Store.</div>
+        <div class="f"><b>💬 Hỏi đáp với giáo viên</b>Mỗi khóa có mục thảo luận riêng — hỏi bài và được trả lời trực tiếp.</div>
+      </div>
+    </section>
+
+    <!-- ================= QUOTE ================= -->
+    <section class="lp-quote" data-sec="quote">
+      <p class="vi">“Biết thêm một ngôn ngữ là sống thêm một cuộc đời.”</p>
+      <p class="en">“One who learns a language lives two lives.”</p>
+      <p class="zh">「学会一门语言，就是多活一个人生。」</p>
+    </section>
+
+    <!-- ================= CONTACT / PRICING ================= -->
+    <section class="lp-section" data-sec="contact" id="lien-he">
+      <div class="lp-contact">
+        <div style="flex:1; min-width:260px;">
+          <h2>Học phí &amp; đăng ký học thử</h2>
+          <p>Liên hệ để biết thêm thông tin về học phí và nhận <b>buổi học thử miễn phí</b>.
+            Nhắn tin Zalo hoặc quét mã QR bên cạnh — thầy sẽ phản hồi trong ngày.</p>
+          <a class="btn zalo" href="https://zalo.me/0961923983" target="_blank" rel="noopener">💬 Nhắn Zalo: 0961 923 983</a>
+          <a class="btn fb" href="https://www.facebook.com/lqt248" target="_blank" rel="noopener">👤 Facebook: lqt248</a>
+        </div>
+        <div class="qr">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https%3A%2F%2Fzalo.me%2F0961923983"
+               alt="Zalo QR" width="150" height="150" loading="lazy" decoding="async" />
+          <span class="kind">Quét để mở Zalo</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="lp-footer">
+    © 2026 Learning Ecology · Thầy Lê Quốc Thông ·
+    <a href="https://zalo.me/0961923983" target="_blank" rel="noopener">Zalo 0961 923 983</a> ·
+    <a href="https://www.facebook.com/lqt248" target="_blank" rel="noopener">Facebook</a>
+    <br /><a href="login.html">Đăng nhập dành cho học viên</a>
+  </footer>
+
+  <!-- lightbox -->
+  <div class="lpx-lb" id="lpxLb" role="dialog" aria-modal="true" aria-label="Xem ảnh lớn">
+    <button class="x" id="lbX" aria-label="Đóng">✕</button>
+    <button class="pn prev" id="lbPrev" aria-label="Ảnh trước">‹</button>
+    <button class="pn next" id="lbNext" aria-label="Ảnh sau">›</button>
+    <figure><img id="lbImg" alt="" /><figcaption id="lbCap"></figcaption></figure>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    // Anonymous visit counter — one row per visit into YOUR Supabase
+    // (owner-only stats). No cookies, no third parties. Uses event
+    // delegation so buttons rendered later are counted too.
+    (function () {
+      try {
+        const src = new URLSearchParams(location.search).get("src")
+          || (document.referrer ? new URL(document.referrer).hostname : "direct");
+        const dev = /Mobi|iPhone|Android.*Mobile/i.test(navigator.userAgent) ? "mobile" : "desktop";
+        const hit = p => { try { sb.from("page_views").insert({ path: p, ref: src, device: dev }).then(() => {}); } catch (e) {} };
+        if (!sessionStorage.getItem("le_seen")) {
+          sessionStorage.setItem("le_seen", "1");
+          hit("home");
+        }
+        document.addEventListener("click", e => {
+          const a = e.target.closest && e.target.closest("a");
+          if (!a) return;
+          const href = a.getAttribute("href") || "";
+          if (href === "login.html") hit("cta-login");
+          else if (a.dataset.hit) hit(a.dataset.hit);
+          else if (href === "#lien-he" || href === "#hoc-thu") hit("cta-trial");
+          else if (href.startsWith("https://zalo.me")) hit("cta-zalo");
+        });
+      } catch (e) { /* stats must never break the page */ }
+    })();
+
+    // Already signed in? Turn the login buttons into "go to my lessons".
+    // Kept in a re-runnable function because the hero is rendered from the
+    // database a moment later — it must not overwrite the signed-in label.
+    window.__lpAuth = { signedIn: false, label: "Vào học ngay →" };
+    window.applyAuthCta = function () {
+      if (!window.__lpAuth.signedIn) return;
+      const label = window.__lpAuth.label || "Vào học ngay →";
+      ["hd-login", "hero-start"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = label; el.href = "dashboard.html"; }
+      });
+    };
+    sb.auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      window.__lpAuth.signedIn = true;
+      window.applyAuthCta();
+    }).catch(() => {});
+  </script>
+  <script>
+    // light / dark switch (the head snippet applied the initial theme)
+    (function () {
+      const root = document.documentElement;
+      const b = document.getElementById("lp-theme");
+      const cur = () => root.getAttribute("data-theme") === "dark";
+      b.textContent = cur() ? "☀️" : "🌙";
+      b.addEventListener("click", () => {
+        const next = cur() ? "light" : "dark";
+        if (next === "dark") root.setAttribute("data-theme", "dark");
+        else root.removeAttribute("data-theme");
+        try { localStorage.setItem("hub_theme", next); } catch (e) {}
+        b.textContent = next === "dark" ? "☀️" : "🌙";
+      });
+    })();
+  </script>
+
+  <script>
+  /* ================= landing content: loaded from the database =================
+     Everything below reads PUBLISHED records that the owner manages in
+     Dashboard → Landing Page. If the database is unreachable or migration35
+     has not run, the page falls back to a minimal static course list and
+     hides the dynamic sections — it never shows broken containers. */
+  (function () {
+    "use strict";
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    /* only allow safe link targets — anything else counts as "no link yet" */
+    const safeUrl = u => {
+      u = String(u || "").trim();
+      return /^(https?:\/\/|\/|#|[a-z0-9_-]+\.html)/i.test(u) ? u : "";
+    };
+    const FOCALS = { center: "50% 50%", top: "50% 0%", bottom: "50% 100%", left: "0% 50%", right: "100% 50%" };
+    const focal = f => FOCALS[f] || (/^\d+% \d+%$/.test(String(f || "")) ? f : "50% 50%");
+    const ph = (title, sub) =>
+      `<div class="lpx-ph"><div>${esc(title)}${sub ? `<br><small>${esc(sub)}</small>` : ""}</div></div>`;
+    /* placeholder underneath + image on top: a broken image simply removes
+       itself and the branded placeholder shows — never a broken-image icon */
+    const img = (url, alt, f) =>
+      ph(alt || "Learning Ecology") + (safeUrl(url)
+        ? `<img src="${esc(url)}" alt="${esc(alt || "")}" loading="lazy" decoding="async"
+               style="position:absolute;inset:0;object-position:${esc(focal(f))};" onerror="this.remove()">`
+        : "");
+    const btnHtml = (label, url, newTab, cls, soonLabel) => {
+      const u = safeUrl(url);
+      return u
+        ? `<a class="btn ${cls || ""}" href="${esc(u)}" ${newTab ? 'target="_blank" rel="noopener"' : ""} data-hit="cta-trial">${esc(label)}</a>`
+        : `<span class="lpx-soon" title="Liên kết sẽ được cập nhật sớm" aria-disabled="true">${esc(soonLabel || "Sắp ra mắt")}</span>`;
+    };
+
+    /* preview mode: the signed-in owner can open index.html?preview=1 to see
+       drafts (marked DRAFT). Anonymous visitors always get published only —
+       that is enforced by the database, not by this flag. */
+    const PREVIEW = new URLSearchParams(location.search).has("preview");
+
+    /* NOTE: supabase-js query builders are thenables with .then() ONLY —
+       they have no .catch(), so errors must be handled via then's second
+       argument (calling .catch on the builder throws a TypeError). */
+    const q = table => sb.from(table).select("*").order("sort_order").order("updated_at")
+      .then(r => (r.data || []).filter(x => x.status === "published" || (PREVIEW && x.status === "draft")),
+            () => []);
+
+    async function boot() {
+      const [settingsRes, courses, trials, teachers, achievements, feedback, gallery] = await Promise.all([
+        sb.from("landing_settings").select("config").eq("id", 1).maybeSingle().then(r => r, () => ({ data: null })),
+        q("landing_courses"), q("landing_trials"), q("landing_teachers"),
+        q("landing_achievements"), q("landing_feedback"), q("landing_gallery")
+      ]);
+      const cfg = (settingsRes && settingsRes.data && settingsRes.data.config) || {};
+      renderHero(cfg);
+      applySections(cfg);
+      renderTrial(cfg, trials);
+      renderCourses(cfg, courses);
+      renderTeachers(cfg, teachers);
+      renderAchievements(cfg, achievements, feedback, gallery);
+      initNav();          // built last, from whatever ended up visible
+    }
+
+    /* ================= header section menu =================
+       Reads the live page: only sections that are actually visible and have a
+       heading become links, in their on-page order. Renaming, hiding, adding
+       or reordering a section in the dashboard therefore updates this menu
+       automatically — there is no separate list to maintain. */
+    function initNav() {
+      const nav = $("lpNav"), list = $("lpNavList"), toggle = $("lpNavToggle");
+      const header = document.querySelector(".lp-header");
+      const items = [];
+      for (const s of document.querySelectorAll("#lp-main > section[data-sec]")) {
+        if (s.hidden || !s.id) continue;
+        const h = s.querySelector("h2");
+        const label = h && h.textContent.trim();
+        if (label) items.push({ id: s.id, label, el: s });
+      }
+      if (items.length < 2) { nav.hidden = true; return; }   // nothing worth navigating
+      nav.hidden = false;
+      list.innerHTML = items.map(it =>
+        `<li><a href="#${esc(it.id)}">${esc(it.label)}</a></li>`).join("");
+      const links = [...list.querySelectorAll("a")];
+      const headerH = () => (header ? header.offsetHeight : 0);
+      const closeMenu = () => { nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); };
+
+      list.addEventListener("click", e => {
+        const a = e.target.closest("a"); if (!a) return;
+        e.preventDefault();
+        const el = document.getElementById(a.getAttribute("href").slice(1));
+        if (!el) return;
+        const top = el.getBoundingClientRect().top + scrollY - headerH() - 8;
+        window.scrollTo({ top: Math.max(0, top), behavior: REDUCED ? "auto" : "smooth" });
+        closeMenu();
+        try { history.replaceState(null, "", "#" + el.id); } catch (err) {}
+      });
+      toggle.addEventListener("click", e => {
+        e.stopPropagation();
+        const open = nav.classList.toggle("open");
+        toggle.setAttribute("aria-expanded", String(open));
+      });
+      document.addEventListener("click", e => { if (!nav.contains(e.target)) closeMenu(); });
+      document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+
+      /* highlight whichever section the reader is currently looking at */
+      function spy() {
+        const line = scrollY + headerH() + 14;
+        let active = -1;
+        items.forEach((it, i) => {
+          if (it.el.getBoundingClientRect().top + scrollY <= line) active = i;
+        });
+        if (scrollY + innerHeight >= document.documentElement.scrollHeight - 4)
+          active = items.length - 1;                        // bottom of page → last link
+        links.forEach((a, i) => a.classList.toggle("on", i === active));
+        if (active >= 0 && list.scrollWidth > list.clientWidth) {
+          const a = links[active], dx = a.offsetLeft - list.scrollLeft;
+          if (dx < 0 || dx + a.offsetWidth > list.clientWidth)
+            list.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: REDUCED ? "auto" : "smooth" });
+        }
+      }
+      let queued = null;
+      addEventListener("scroll", () => {
+        if (queued) return;
+        queued = setTimeout(() => { queued = null; spy(); }, 90);
+      }, { passive: true });
+      addEventListener("resize", spy, { passive: true });
+      spy();
+    }
+
+    /* ================= teaching team (3D carousel, all data from the
+       landing_teachers table — nothing about a teacher is hard-coded) ====== */
+    function renderTeachers(cfg, teachers) {
+      const sec = document.querySelector('[data-sec="teacher"]');
+      if (!teachers.length) { sec.hidden = true; return; }   // nothing published → hide cleanly
+      sec.hidden = false;
+      const t = cfg.titles || {};
+      if (t.teacher) $("tchTitle").textContent = t.teacher;
+      if (t.teacher_lead) $("tchLead").textContent = t.teacher_lead;
+      const n = teachers.length;
+
+      const link = (label, url, ghost) => {
+        const u = safeUrl(url);
+        return (u && label) ? `<a class="btn${ghost ? " ghost" : ""}" href="${esc(u)}"
+          target="_blank" rel="noopener">${esc(label)}</a>` : "";
+      };
+      const card = (T, i) => {
+        const initial = (T.name || "?").trim().charAt(0).toUpperCase();
+        const pos = /^\d{1,3}% \d{1,3}%$/.test(String(T.photo_pos || "").trim())
+          ? T.photo_pos.trim() : "50% 18%";
+        const photo = safeUrl(T.photo_url)
+          ? `<img class="photo" src="${esc(T.photo_url)}" alt="${esc(T.photo_alt || T.name)}"
+                  loading="lazy" decoding="async" style="object-position:${esc(pos)};"
+                  onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
+             <div class="photo-fb">${esc(initial)}</div>`
+          : `<div class="photo-fb" style="display:grid">${esc(initial)}</div>`;
+        const badges = String(T.badges || "").split("\n").map(x => x.trim()).filter(Boolean);
+        return `
+          <div class="tf-card" data-i="${i}" role="group"
+               aria-label="${esc(T.name)}, mục ${i + 1} trên ${n}">
+            <div class="lp-teacher">
+              ${photo}
+              <div class="info">
+                ${T.status === "draft" ? '<span class="lpx-draft" style="position:static;display:inline-block;margin-bottom:.4rem;">DRAFT</span>' : ""}
+                <h3>${esc(T.name)}</h3>
+                ${T.role_label ? `<p style="color:var(--muted); margin:0 0 .7rem;">${esc(T.role_label)}</p>` : ""}
+                ${badges.length ? `<div class="creds" style="margin:0 0 .9rem;">${
+                  badges.map(b => `<span class="cred-badge">${esc(b)}</span>`).join(" ")}</div>` : ""}
+                ${T.bio ? `<p class="tf-bio">${esc(T.bio).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")}</p>` : ""}
+                <div class="tf-links">
+                  ${link(T.zalo_label, T.zalo_url)}
+                  ${link(T.fb_label, T.fb_url, true)}
+                  ${link(T.x3_label, T.x3_url, true)}
+                </div>
+              </div>
+            </div>
+          </div>`;
+      };
+
+      $("teacherBox").innerHTML =
+        `<div class="tf-wrap">
+          <div class="tf-stage" id="twStage" tabindex="0" role="group" aria-roledescription="băng chuyền"
+               aria-label="Đội ngũ giáo viên — dùng phím mũi tên để chuyển">${teachers.map(card).join("")}</div>
+          ${n > 1 ? `
+          <div class="lpx-nav">
+            <button id="twPrev" aria-label="Giáo viên trước">‹</button>
+            <div class="lpx-dots" id="twDots" role="tablist" aria-label="Chọn giáo viên">${teachers.map((T, i) =>
+              `<button role="tab" data-i="${i}" aria-label="Giáo viên ${i + 1}: ${esc(T.name)}"></button>`).join("")}</div>
+            <button id="twNext" aria-label="Giáo viên tiếp theo">›</button>
+          </div>` : ""}
+          <span class="sr-only" id="twLive" aria-live="polite"></span>
+        </div>`;
+      if (n > 1) teacherFlow(teachers, cfg);
+      else $("teacherBox").querySelector(".tf-card").classList.add("on");
+    }
+
+    /* never autoplays — it moves only when the visitor asks it to */
+    function teacherFlow(items, cfg) {
+      const n = items.length;
+      const loop = cfg.teachers_loop !== false;
+      const stage = $("twStage"), cards = [...stage.children], dots = [...$("twDots").children];
+      const prevBtn = $("twPrev"), nextBtn = $("twNext");
+      let idx = 0, busy = false;
+
+      function layout() {
+        cards.forEach((card, i) => {
+          let o = i - idx;
+          if (loop) {                                  /* shortest way round the ring */
+            if (o > n / 2) o -= n;
+            if (o < -n / 2) o += n;
+          }
+          const abs = Math.abs(o);
+          const vis = abs <= 1 || (abs <= 2 && n > 3);
+          card.style.transform = REDUCED
+            ? `translateX(${o * 102}%)`
+            : `translateX(${o * 58}%) scale(${o === 0 ? 1 : Math.max(.8, .87 - (abs - 1) * .07)})
+               rotateY(${o === 0 ? 0 : (o < 0 ? 26 : -26)}deg)`;
+          card.style.zIndex = 10 - abs;
+          card.style.opacity = vis ? String(o === 0 ? 1 : Math.max(.35, .7 - (abs - 1) * .3)) : "0";
+          card.classList.toggle("on", o === 0);
+          card.setAttribute("aria-hidden", vis ? "false" : "true");
+          /* only the readable card keeps its links in the tab order */
+          card.querySelectorAll("a").forEach(a => { a.tabIndex = o === 0 ? 0 : -1; });
+          if (dots[i]) dots[i].classList.toggle("on", i === idx);
+        });
+        $("twLive").textContent = items[idx].name + ", mục " + (idx + 1) + " trên " + n;
+        if (!loop) {
+          prevBtn.disabled = idx === 0;
+          nextBtn.disabled = idx === n - 1;
+        }
+      }
+      /* one move per gesture: input is ignored while a transition runs */
+      function goTo(i) {
+        if (busy) return;
+        if (loop) i = (i + n) % n;
+        else if (i < 0 || i > n - 1) return;
+        if (i === idx) return;
+        busy = true; idx = i; layout();
+        setTimeout(() => { busy = false; }, REDUCED ? 0 : 520);
+      }
+      const go = d => goTo(idx + d);
+
+      prevBtn.addEventListener("click", () => go(-1));
+      nextBtn.addEventListener("click", () => go(1));
+      dots.forEach(d => d.addEventListener("click", () => goTo(+d.dataset.i)));
+      cards.forEach(c => c.addEventListener("click", e => {
+        if (e.target.closest("a")) return;             /* contact links stay clickable */
+        const i = +c.dataset.i; if (i !== idx) goTo(i);
+      }));
+      stage.addEventListener("keydown", e => {
+        if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+        if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+      });
+      /* mouse / trackpad drag and touch swipe */
+      let px = null;
+      stage.addEventListener("pointerdown", e => {
+        if (e.target.closest("a")) return;
+        px = e.clientX; stage.classList.add("drag");
+      });
+      const endDrag = e => {
+        if (px === null) return;
+        const dx = e.clientX - px; px = null; stage.classList.remove("drag");
+        if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1);
+      };
+      stage.addEventListener("pointerup", endDrag);
+      stage.addEventListener("pointercancel", () => { px = null; stage.classList.remove("drag"); });
+      layout();
+    }
+
+    /* ================= hero (owner-editable; every field left blank in the
+       dashboard keeps the wording currently on the page) ==================== */
+    function renderHero(cfg) {
+      const H = cfg.hero || {};
+      if (H.signed_label) window.__lpAuth.label = H.signed_label;
+      if (H.title) $("heroTitle").innerHTML = esc(H.title).replace(/\n/g, "<br>");
+      if (H.sub) $("heroSub").textContent = H.sub;
+      if (H.p_label || H.p_url || H.s_label || H.s_url) {
+        const pLabel = H.p_label || "Bắt đầu học →";
+        const pUrl = safeUrl(H.p_url) || "login.html";
+        const sLabel = H.s_label || "Học thử miễn phí";
+        const sUrl = safeUrl(H.s_url) || "#hoc-thu";
+        $("heroCta").innerHTML =
+          `<a id="hero-start" class="btn gold" href="${esc(pUrl)}">${esc(pLabel)}</a>
+           <a class="btn ghost" href="${esc(sUrl)}" data-hit="cta-trial"
+              ${H.s_new ? 'target="_blank" rel="noopener"' : ""}
+              style="color:#fff; border-color:rgba(255,255,255,0.5);">${esc(sLabel)}</a>`;
+      }
+      const chips = String(H.chips || "").split("\n").map(x => x.trim()).filter(Boolean);
+      if (chips.length)
+        $("heroChips").innerHTML = chips.map(c => `<span>${esc(c)}</span>`).join("");
+      /* re-apply the "Vào học ngay →" swap in case sign-in resolved first */
+      if (window.applyAuthCta) window.applyAuthCta();
+    }
+
+    /* ---- section order + visibility from the owner's settings ---- */
+    function applySections(cfg) {
+      const main = $("lp-main");
+      /* visitors always get the PUBLISHED order; the owner's unpublished
+         draft is only applied in preview mode (index.html?preview=1) */
+      const draft = PREVIEW && Array.isArray(cfg.sections_draft) && cfg.sections_draft.length
+        ? cfg.sections_draft : null;
+      const list = draft || (Array.isArray(cfg.sections) && cfg.sections.length ? cfg.sections : null);
+      if (!list) return;
+      for (const s of list) {
+        const el = main.querySelector(`[data-sec="${s.id}"]`);
+        if (!el) continue;
+        main.appendChild(el);                       // append in configured order
+        if (s.show === false) el.hidden = true;
+      }
+      const t = cfg.titles || {};
+      if (t.courses) { $("coursesTitle").textContent = t.courses; }
+      if (t.courses_lead) { $("coursesLead").textContent = t.courses_lead; }
+      if (t.achieve) { $("achTitle").textContent = t.achieve; }
+      if (t.achieve_lead) { $("achLead").textContent = t.achieve_lead; }
+    }
+
+    /* ================= Học thử miễn phí (3D cover-flow) ================= */
+    function renderTrial(cfg, items) {
+      const sec = document.querySelector('[data-sec="trial"]');
+      const t = cfg.trial || {};
+      if (t.show === false) { sec.hidden = true; return; }
+      const soon = t.soon_label || "Sắp ra mắt";
+      const p = btnHtml(t.p_label || "Học thử miễn phí", t.p_url, t.p_new !== false, "gold", soon);
+      const s = btnHtml(t.s_label || "Nhắn Zalo tư vấn", t.s_url, t.s_new !== false, "ghost", soon);
+      const bg = safeUrl(t.image);
+      const n = items.length;
+      $("trialBox").innerHTML =
+        `<div class="lpx-trial${bg ? " hasimg" : ""}" ${bg ? `style="background-image:url('${esc(bg)}')"` : ""}>
+          ${t.badge ? `<span class="lpx-badge">${esc(t.badge)}</span>` : ""}
+          <h2>${esc(t.title || "Học thử miễn phí")}</h2>
+          ${t.intro ? `<p class="lead">${esc(t.intro)}</p>` : ""}
+          <div class="ctas">${t.primary_first === false ? s + p : p + s}</div>
+          ${n ? `
+          <div class="lpx-tflow">
+            <div class="lpx-tstage" id="tfStage" tabindex="0" role="group" aria-roledescription="băng chuyền"
+                 aria-label="Các khóa học thử miễn phí — dùng phím mũi tên để chuyển">${items.map((it, i) => `
+              <article class="lpx-trc" data-i="${i}" role="group"
+                       aria-label="${esc(it.title)}, mục ${i + 1} trên ${n}">
+                ${it.status === "draft" ? '<span class="lpx-draft">DRAFT</span>' : ""}
+                <div class="thumb">${img(it.image_url, it.image_alt || it.title)}</div>
+                <div class="tb">
+                  ${it.course_label ? `<span class="cat">${esc(it.course_label)}</span>` : ""}
+                  <h3>${esc(it.title)}</h3>
+                  ${it.description ? `<p>${esc(it.description)}</p>` : ""}
+                  <div class="act">${btnHtml(it.btn_label || "Học thử miễn phí", it.url, it.new_tab !== false, "", soon)}</div>
+                </div>
+              </article>`).join("")}
+            </div>
+            ${n > 1 ? `
+            <div class="lpx-nav">
+              <button id="tfPrev" aria-label="Khóa học trước">‹</button>
+              <div class="lpx-dots" id="tfDots" role="tablist" aria-label="Chọn khóa học thử">${items.map((it, i) =>
+                `<button role="tab" data-i="${i}" aria-label="Học thử ${i + 1}: ${esc(it.title)}"></button>`).join("")}</div>
+              <button id="tfNext" aria-label="Khóa học tiếp theo">›</button>
+              ${cfg.autoplay ? '<button id="tfPause" aria-label="Tạm dừng tự chạy" aria-pressed="false">⏸</button>' : ""}
+            </div>` : ""}
+            <span class="sr-only" id="tfLive" aria-live="polite"></span>
+          </div>` : ""}
+        </div>`;
+      if (n) trialFlow(items, cfg);
+    }
+
+    function trialFlow(items, cfg) {
+      const n = items.length;
+      const stage = $("tfStage"), cards = [...stage.children];
+      const dots = n > 1 ? [...$("tfDots").children] : [];
+      let idx = 0, wheelLock = 0, autoplayTimer = null;
+      const autoplayMs = Math.min(15000, Math.max(4000, +cfg.autoplay_ms || 6000));
+      let autoplayOn = n > 1 && !!cfg.autoplay && !REDUCED;
+
+      function layout() {
+        cards.forEach((card, i) => {
+          let o = i - idx;
+          if (o > n / 2) o -= n;                       /* shortest path around the ring */
+          if (o < -n / 2) o += n;
+          const abs = Math.abs(o);
+          const vis = abs <= 1 || (abs <= 2 && n > 3); /* previous · active · next (+1 depth layer) */
+          card.style.transform = REDUCED
+            ? `translateX(${o * 103}%)`
+            : `translateX(${o * 62}%) scale(${o === 0 ? 1 : Math.max(0.78, 0.86 - (abs - 1) * 0.08)})
+               rotateY(${o === 0 ? 0 : (o < 0 ? 28 : -28)}deg)`;
+          card.style.zIndex = 10 - abs;
+          card.style.opacity = vis ? String(o === 0 ? 1 : Math.max(0.35, 0.72 - (abs - 1) * 0.3)) : "0";
+          card.classList.toggle("on", o === 0);
+          card.setAttribute("aria-hidden", vis ? "false" : "true");
+          /* focus stays on reachable content only: side/hidden cards drop out of the tab order */
+          card.querySelectorAll("a, button").forEach(el => { el.tabIndex = o === 0 ? 0 : -1; });
+          if (dots[i]) dots[i].classList.toggle("on", i === idx);
+        });
+        $("tfLive").textContent = items[idx].title + ", mục " + (idx + 1) + " trên " + n;
+      }
+      const go = d => { idx = (idx + d + n) % n; layout(); };
+      function stopAuto() { if (autoplayTimer) { clearInterval(autoplayTimer); autoplayTimer = null; } }
+      function startAuto() { stopAuto(); if (autoplayOn && document.visibilityState === "visible") autoplayTimer = setInterval(() => go(1), autoplayMs); }
+      /* manual navigation must not be followed by an immediate autoplay jump */
+      function userTouched() { stopAuto(); if (autoplayOn) setTimeout(startAuto, autoplayMs * 2); }
+
+      cards.forEach(card => card.addEventListener("click", e => {
+        if (e.target.closest("a")) return;             /* CTA clicks never rotate the carousel */
+        const i = +card.dataset.i;
+        if (i !== idx) { userTouched(); idx = i; layout(); }
+      }));
+      if (n > 1) {
+        $("tfPrev").addEventListener("click", () => { userTouched(); go(-1); });
+        $("tfNext").addEventListener("click", () => { userTouched(); go(1); });
+        dots.forEach(d => d.addEventListener("click", () => { userTouched(); idx = +d.dataset.i; layout(); }));
+        stage.addEventListener("keydown", e => {
+          if (e.key === "ArrowLeft") { e.preventDefault(); userTouched(); go(-1); }
+          if (e.key === "ArrowRight") { e.preventDefault(); userTouched(); go(1); }
+        });
+        /* wheel: intentional horizontal gestures only, one card per gesture;
+           vertical scrolling is never intercepted, so the page scrolls naturally */
+        stage.addEventListener("wheel", e => {
+          if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 18) return;
+          e.preventDefault();
+          const now = Date.now();
+          if (now - wheelLock < 500) return;
+          wheelLock = now;
+          userTouched(); go(e.deltaX > 0 ? 1 : -1);
+        }, { passive: false });
+        let px = null;
+        stage.addEventListener("pointerdown", e => { px = e.clientX; });
+        stage.addEventListener("pointerup", e => {
+          if (px === null) return;
+          const dx = e.clientX - px; px = null;
+          if (Math.abs(dx) > 40) { userTouched(); go(dx < 0 ? 1 : -1); }
+        });
+        const pauseBtn = $("tfPause");
+        if (pauseBtn) pauseBtn.addEventListener("click", () => {
+          autoplayOn = !autoplayOn;
+          pauseBtn.textContent = autoplayOn ? "⏸" : "▶";
+          pauseBtn.setAttribute("aria-pressed", String(!autoplayOn));
+          autoplayOn ? startAuto() : stopAuto();
+        });
+        stage.addEventListener("pointerenter", stopAuto);
+        stage.addEventListener("pointerleave", () => { if (autoplayOn) startAuto(); });
+        stage.addEventListener("focusin", stopAuto);   /* keyboard users are never moved mid-read */
+        stage.addEventListener("focusout", () => { if (autoplayOn) startAuto(); });
+        if (window.__tfVis) document.removeEventListener("visibilitychange", window.__tfVis);
+        window.__tfVis = () => { document.visibilityState === "visible" ? startAuto() : stopAuto(); };
+        document.addEventListener("visibilitychange", window.__tfVis);
+      }
+      layout();
+      startAuto();
+    }
+
+    /* ================= course cover-flow carousel ================= */
+    const FALLBACK_COURSES = [
+      { title: "Tiếng Trung HSK" }, { title: "IELTS" }, { title: "VSTEP" },
+      { title: "Tiếng Anh Giao tiếp" }, { title: "Công cụ giảng dạy" }
+    ];
+    function renderCourses(cfg, courses) {
+      const sec = document.querySelector('[data-sec="courses"]');
+      const list = courses.length ? courses : FALLBACK_COURSES;
+      if (!list.length) { sec.hidden = true; return; }
+      let idx = Math.max(0, list.findIndex(c => c.id && c.id === cfg.default_course));
+      if (idx < 0) idx = 0;
+      const soon = (cfg.trial || {}).soon_label || "Sắp ra mắt";
+
+      $("courseBox").innerHTML =
+        `<div class="lpx-cwrap">
+          <div class="lpx-stage" id="cfStage" tabindex="0" role="listbox"
+               aria-label="Các khóa học — dùng phím mũi tên để chuyển">${list.map((c, i) => `
+            <div class="lpx-card" data-i="${i}" role="option" aria-selected="false">
+              ${c.status === "draft" ? '<span class="lpx-draft">DRAFT</span>' : ""}
+              <div class="cov">${img(c.cover_url, c.cover_alt || c.title, c.focal)}</div>
+              <div class="strip"><h3>${esc(c.title)}</h3>
+                ${c.category ? `<span class="tag">${esc(c.category)}</span>` : ""}</div>
+            </div>`).join("")}
+          </div>
+          <div class="lpx-nav">
+            <button id="cfPrev" aria-label="Khóa trước">‹</button>
+            <div class="lpx-dots" id="cfDots" role="tablist">${list.map((c, i) =>
+              `<button role="tab" data-i="${i}" aria-label="Khóa ${i + 1}: ${esc(c.title)}"></button>`).join("")}</div>
+            <button id="cfNext" aria-label="Khóa sau">›</button>
+            ${cfg.autoplay ? '<button id="cfPause" aria-label="Tạm dừng tự chạy" aria-pressed="false">⏸</button>' : ""}
+          </div>
+          <div class="lpx-info" id="cfInfo" aria-live="polite"></div>
+        </div>`;
+
+      const stage = $("cfStage"), cards = [...stage.children], dots = [...$("cfDots").children];
+      const info = $("cfInfo");
+      let autoplayTimer = null;
+      const autoplayMs = Math.min(15000, Math.max(4000, +cfg.autoplay_ms || 6000));
+      let autoplayOn = !!cfg.autoplay && !REDUCED;
+
+      function layout() {
+        cards.forEach((card, i) => {
+          let o = i - idx;
+          /* shortest path around the ring */
+          if (o > list.length / 2) o -= list.length;
+          if (o < -list.length / 2) o += list.length;
+          const abs = Math.abs(o);
+          const vis = abs <= 2;
+          card.style.transform = REDUCED
+            ? `translateX(${o * 102}%)`
+            : `translateX(${o * 56}%) scale(${Math.max(0.68, 1 - abs * 0.14)})
+               rotateY(${o === 0 ? 0 : (o < 0 ? 16 : -16)}deg)`;
+          card.style.zIndex = 10 - abs;
+          card.style.opacity = vis ? String(1 - abs * 0.25) : "0";
+          card.style.filter = abs ? "saturate(0.8)" : "none";
+          card.setAttribute("aria-hidden", vis ? "false" : "true");
+          card.setAttribute("aria-selected", o === 0 ? "true" : "false");
+          dots[i].classList.toggle("on", i === idx);
+        });
+        renderInfo(list[idx]);
+      }
+      function renderInfo(c) {
+        const lines = s => String(s || "").split("\n").map(x => x.trim()).filter(Boolean);
+        const meta = [];
+        if (c.lesson_count) meta.push(`<span>📚 <b>${esc(c.lesson_count)}</b></span>`);
+        if (c.period) meta.push(`<span>⏳ <b>${esc(c.period)}</b></span>`);
+        if (c.access_type) meta.push(`<span>${c.access_type === "premium" ? "👑" : "🔓"} <b>${esc(
+          c.access_type === "premium" ? "Premium" : c.access_type === "free" ? "Miễn phí" : "Miễn phí + Premium")}</b></span>`);
+        if (c.audience) meta.push(`<span>🎯 <b>${esc(c.audience)}</b></span>`);
+        const html =
+          `<h3>${esc(c.title)}</h3>
+          ${c.tagline ? `<p class="tagline">${esc(c.tagline)}</p>` : ""}
+          ${meta.length ? `<div class="meta">${meta.join("")}</div>` : ""}
+          ${c.description ? `<p class="desc">${esc(c.description)}</p>` : ""}
+          ${lines(c.outcomes).length ? `<ul>${lines(c.outcomes).map(x => `<li>✅ ${esc(x)}</li>`).join("")}</ul>` : ""}
+          ${lines(c.features).length ? `<ul>${lines(c.features).map(x => `<li>✨ ${esc(x)}</li>`).join("")}</ul>` : ""}
+          ${c.price ? `<p class="price">${esc(c.price)}</p>` : ""}
+          <div class="ctas">
+            ${btnHtml(c.btn1_label || "Học thử miễn phí", c.btn1_url, c.new_tab, "gold", soon)}
+            ${(c.btn2_label || c.btn2_url) ? btnHtml(c.btn2_label || "Xem chi tiết", c.btn2_url, c.new_tab, "ghost", soon) : ""}
+          </div>`;
+        if (REDUCED) { info.innerHTML = html; return; }
+        info.classList.add("swap");
+        setTimeout(() => { info.innerHTML = html; info.classList.remove("swap"); }, 160);
+      }
+      const go = d => { idx = (idx + d + list.length) % list.length; layout(); };
+      const goTo = i => { idx = i; layout(); };
+      $("cfPrev").addEventListener("click", () => { userTouched(); go(-1); });
+      $("cfNext").addEventListener("click", () => { userTouched(); go(1); });
+      dots.forEach(d => d.addEventListener("click", () => { userTouched(); goTo(+d.dataset.i); }));
+      cards.forEach(card => card.addEventListener("click", () => {
+        const i = +card.dataset.i; if (i !== idx) { userTouched(); goTo(i); }
+      }));
+      stage.addEventListener("keydown", e => {
+        if (e.key === "ArrowLeft") { e.preventDefault(); userTouched(); go(-1); }
+        if (e.key === "ArrowRight") { e.preventDefault(); userTouched(); go(1); }
+      });
+      /* horizontal wheel / trackpad only — vertical scrolling stays normal */
+      stage.addEventListener("wheel", e => {
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 12) {
+          e.preventDefault(); userTouched(); go(e.deltaX > 0 ? 1 : -1);
+        }
+      }, { passive: false });
+      /* touch swipe */
+      let px = null;
+      stage.addEventListener("pointerdown", e => { px = e.clientX; });
+      stage.addEventListener("pointerup", e => {
+        if (px === null) return;
+        const dx = e.clientX - px; px = null;
+        if (Math.abs(dx) > 40) { userTouched(); go(dx < 0 ? 1 : -1); }
+      });
+      /* slow optional autoplay: pause on interaction/hover, visible pause button */
+      function startAuto() {
+        stopAuto();
+        if (autoplayOn) autoplayTimer = setInterval(() => go(1), autoplayMs);
+      }
+      function stopAuto() { if (autoplayTimer) { clearInterval(autoplayTimer); autoplayTimer = null; } }
+      function userTouched() { stopAuto(); if (autoplayOn) setTimeout(startAuto, autoplayMs * 2); }
+      const pauseBtn = $("cfPause");
+      if (pauseBtn) pauseBtn.addEventListener("click", () => {
+        autoplayOn = !autoplayOn;
+        pauseBtn.textContent = autoplayOn ? "⏸" : "▶";
+        pauseBtn.setAttribute("aria-pressed", String(!autoplayOn));
+        autoplayOn ? startAuto() : stopAuto();
+      });
+      stage.addEventListener("pointerenter", stopAuto);
+      stage.addEventListener("pointerleave", () => { if (autoplayOn) startAuto(); });
+      layout();
+      startAuto();
+    }
+
+    /* ================= achievements / feedback / gallery ================= */
+    const ACH_CATS = { achievement: "Thành tựu", certificate: "Chứng chỉ", result: "Kết quả học viên", activity: "Hoạt động" };
+    const GAL_CATS = { activity: "Hoạt động", platform: "Hoạt động", result: "Kết quả học viên", event: "Hoạt động", other: "Hoạt động" };
+    function renderAchievements(cfg, ach, fb, gal) {
+      const sec = document.querySelector('[data-sec="achieve"]');
+      const items = [
+        ...ach.map(a => ({ kind: "ach", cat: ACH_CATS[a.category] || "Thành tựu", title: a.title,
+          text: [a.org, a.date_text].filter(Boolean).join(" · "), desc: a.description,
+          image: a.image_url, alt: a.image_alt || a.title, verify: safeUrl(a.verify_url), draft: a.status === "draft" })),
+        ...fb.map(f => ({ kind: "fb", cat: "Phản hồi", title: f.student_name,
+          text: [f.course_label, f.role_label].filter(Boolean).join(" · "),
+          desc: f.feedback, result: f.result, image: f.shot_url, alt: f.shot_caption || ("Phản hồi của " + f.student_name),
+          avatar: f.avatar_url, draft: f.status === "draft" })),
+        ...gal.map(g => ({ kind: "gal", cat: GAL_CATS[g.category] || "Hoạt động", title: g.caption || "",
+          text: g.date_text || "", desc: "", image: g.image_url, alt: g.image_alt || g.caption || "Ảnh lớp học",
+          draft: g.status === "draft" }))
+      ];
+      if (!items.length) { sec.hidden = true; return; }
+      sec.hidden = false;
+      const FILTERS = ["Tất cả", "Thành tựu", "Chứng chỉ", "Kết quả học viên", "Phản hồi", "Hoạt động"];
+      const startCat = FILTERS.includes(cfg.ach_filter) ? cfg.ach_filter : "Tất cả";
+      let current = startCat;
+      $("achBox").innerHTML =
+        `<div class="lpx-filters" id="achFilters">${FILTERS.map(f =>
+          `<button data-f="${esc(f)}" class="${f === current ? "on" : ""}" ${f === current ? 'aria-pressed="true"' : ""}>${esc(f)}</button>`).join("")}</div>
+        <div class="lpx-atrack" id="achTrack" tabindex="0" aria-label="Thành tựu và cảm nhận — cuộn ngang"></div>
+        <div class="lpx-nav">
+          <button id="achPrev" aria-label="Trước">‹</button>
+          <button id="achNext" aria-label="Sau">›</button>
+        </div>`;
+      const track = $("achTrack");
+      let shown = [];
+      function paint() {
+        shown = items.filter(x => current === "Tất cả" || x.cat === current);
+        track.innerHTML = shown.map((x, i) => `
+          <article class="lpx-acard" data-i="${i}" ${x.image ? 'data-lb="1"' : ""} tabindex="0"
+                   aria-label="${esc(x.cat)}: ${esc(x.title || x.alt)}">
+            ${x.draft ? '<span class="lpx-draft">DRAFT</span>' : ""}
+            ${x.kind === "fb" && !x.image
+              ? `<div class="ab"><span class="cat">${esc(x.cat)}</span>
+                  <p class="fbtext">“${esc(x.desc)}”</p>
+                  ${x.result ? `<p>📈 ${esc(x.result)}</p>` : ""}
+                  <div class="who">${esc(x.title)}${x.text ? " — " + esc(x.text) : ""}</div></div>`
+              : `<div class="im">${img(x.image, x.alt)}</div>
+                <div class="ab"><span class="cat">${esc(x.cat)}</span>
+                  ${x.title ? `<h3>${esc(x.title)}</h3>` : ""}
+                  ${x.text ? `<p>${esc(x.text)}</p>` : ""}
+                  ${x.kind === "fb" && x.desc ? `<p class="fbtext">“${esc(x.desc)}”</p>` : (x.desc ? `<p>${esc(x.desc)}</p>` : "")}
+                </div>`}
+          </article>`).join("")
+          || `<p class="lead" style="width:100%;">Chưa có mục nào trong nhóm này.</p>`;
+      }
+      paint();
+      $("achFilters").addEventListener("click", e => {
+        const b = e.target.closest("button"); if (!b) return;
+        current = b.dataset.f;
+        [...$("achFilters").children].forEach(x => {
+          x.classList.toggle("on", x === b);
+          x.toggleAttribute("aria-pressed", x === b);
+        });
+        paint();
+      });
+      const step = () => Math.min(340, track.clientWidth * 0.8);
+      $("achPrev").addEventListener("click", () => track.scrollBy({ left: -step(), behavior: REDUCED ? "auto" : "smooth" }));
+      $("achNext").addEventListener("click", () => track.scrollBy({ left: step(), behavior: REDUCED ? "auto" : "smooth" }));
+      track.addEventListener("keydown", e => {
+        if (e.key === "ArrowLeft") { e.preventDefault(); $("achPrev").click(); }
+        if (e.key === "ArrowRight") { e.preventDefault(); $("achNext").click(); }
+      });
+      /* lightbox for image cards */
+      let lbList = [], lbIdx = 0;
+      const lb = $("lpxLb");
+      function openLb(i) {
+        lbList = shown.filter(x => x.image);
+        if (!lbList.length) return;
+        lbIdx = Math.max(0, lbList.indexOf(shown[i]));
+        showLb();
+        lb.classList.add("open");
+        $("lbX").focus();
+      }
+      function showLb() {
+        const x = lbList[lbIdx];
+        $("lbImg").src = x.image; $("lbImg").alt = x.alt || "";
+        $("lbCap").textContent = [x.title, x.text, x.desc].filter(Boolean).join(" — ");
+      }
+      const closeLb = () => { lb.classList.remove("open"); $("lbImg").src = ""; };
+      track.addEventListener("click", e => {
+        const card = e.target.closest(".lpx-acard[data-lb]"); if (card) openLb(+card.dataset.i);
+      });
+      track.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+          const card = e.target.closest(".lpx-acard[data-lb]"); if (card) openLb(+card.dataset.i);
+        }
+      });
+      $("lbX").addEventListener("click", closeLb);
+      $("lbPrev").addEventListener("click", () => { lbIdx = (lbIdx - 1 + lbList.length) % lbList.length; showLb(); });
+      $("lbNext").addEventListener("click", () => { lbIdx = (lbIdx + 1) % lbList.length; showLb(); });
+      lb.addEventListener("click", e => { if (e.target === lb) closeLb(); });
+      document.addEventListener("keydown", e => {
+        if (!lb.classList.contains("open")) return;
+        if (e.key === "Escape") closeLb();
+        if (e.key === "ArrowLeft") $("lbPrev").click();
+        if (e.key === "ArrowRight") $("lbNext").click();
+      });
+    }
+
+    boot().catch(() => {
+      /* database unreachable: show the fallback course names, hide the rest */
+      try {
+        renderTrial({}, []);
+        renderCourses({}, []);
+        document.querySelector('[data-sec="achieve"]').hidden = true;
+      } catch (e) {}
+    });
+  })();
+  </script>
+  <script>
+    // Very light cursor parallax for the decorative background only.
+    // Desktop pointers only; skipped entirely on touch devices and when the
+    // visitor prefers reduced motion. Writes two CSS variables (rAF-throttled)
+    // that shift the decorative layers a few pixels — no text, button, card
+    // or other functional element is ever moved.
+    (function () {
+      var bg = document.getElementById("lpBg");
+      if (!bg || !window.matchMedia) return;
+      if (!matchMedia("(pointer: fine)").matches) return;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      var queued = false, mx = 0, my = 0;
+      addEventListener("mousemove", function (e) {
+        mx = (e.clientX / innerWidth) * 2 - 1;
+        my = (e.clientY / innerHeight) * 2 - 1;
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(function () {
+          queued = false;
+          bg.style.setProperty("--mx", mx.toFixed(3));
+          bg.style.setProperty("--my", my.toFixed(3));
+        });
+      }, { passive: true });
+    })();
+  </script>
+  <script>
+    // PWA: offline shell + installability (needs HTTPS, e.g. GitHub Pages)
+    if ("serviceWorker" in navigator && location.protocol === "https:")
+      navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>

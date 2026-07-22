@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organizations — Learning Ecology</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    /* apply dark mode before first paint: saved choice, else device preference */
+    try { var __t = localStorage.getItem("hub_theme");
+      if (__t === "dark" || (!__t && matchMedia("(prefers-color-scheme: dark)").matches))
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#17263e" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Learning Ecology" />
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand"><img src="icons/icon-192.png" alt="" />Learning Ecology</span>
+    <div style="display:flex; align-items:center; gap:0.4rem;">
+      <a class="btn ghost" href="dashboard.html" style="text-decoration:none;">← <span id="nav-dash"></span></a>
+      <span id="bell-slot"></span>
+      <button class="ghost" id="lang-btn"></button>
+      <button class="ghost" id="signout"></button>
+    </div>
+  </header>
+
+  <main class="container" id="app"></main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+  <script src="config.js"></script>
+  <script src="ui.js"></script>
+  <script>
+    const { t2, toast, confirmDialog, promptDialog, skeleton, csv, icon,
+            refreshIcons, wireLangButton, rerender } = window.UI;
+    const app = document.getElementById("app");
+    let user = null;
+
+    document.getElementById("nav-dash").textContent = t2("dashboard");
+    document.getElementById("signout").textContent = t2("sign_out");
+    document.getElementById("signout").addEventListener("click", async () => {
+      await sb.auth.signOut();
+      window.location.href = "login.html";
+    });
+    wireLangButton(document.getElementById("lang-btn"));
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c =>
+        ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+    }
+    const nameOf = p => p?.full_name || p?.email || "—";
+
+    async function callFn(payload) {
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(SUPABASE_URL + "/functions/v1/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json",
+                   Authorization: "Bearer " + session.access_token,
+                   apikey: SUPABASE_ANON_KEY },
+        body: JSON.stringify(payload)
+      });
+      const out = await res.json();
+      if (!res.ok || out.error) throw new Error(out.error || "Request failed");
+      return out;
+    }
+
+    async function start() {
+      app.innerHTML = skeleton(3);
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = "login.html"; return; }
+      user = session.user;
+      const { data: me } = await sb.from("profiles")
+        .select("role").eq("id", user.id).single();
+      if (me?.role !== "owner") { window.location.href = "dashboard.html"; return; }
+      window.UI.initBell(document.getElementById("bell-slot"));
+      window.UI.initNav({
+        items: [
+          { href: "dashboard.html", label: t2("dashboard"), icon: "layout-dashboard", group: t2("dashboard") },
+          { id: "orgs", label: t2("organizations"), icon: "building-2", group: t2("g_settings") },
+        ],
+        active: "orgs",
+      });
+      render();
+    }
+
+    async function render() {
+      const [{ data: orgs }, { data: people }, { data: courses },
+             { data: licenses }, { data: enrollments }, { data: tcs }] = await Promise.all([
+        sb.from("organizations").select("*").order("created_at"),
+        sb.from("profiles").select("id, full_name, email, role, org_id").order("created_at"),
+        sb.from("courses").select("id, title").order("sort_order"),
+        sb.from("course_licenses").select("*"),
+        sb.from("enrollments").select("id, org_id, course_id"),
+        sb.from("teacher_courses").select("teacher_id, course_id, org_id")
+      ]);
+
+      const cTitle = id => (courses || []).find(c => c.id === id)?.title || "—";
+      const courseOptions = (courses || []).map(c =>
+        `<option value="${c.id}">${esc(c.title)}</option>`).join("");
+      const membersOf = oid => (people || []).filter(p => p.org_id === oid);
+      const orgName = oid => (orgs || []).find(o => o.id === oid)?.name || "?";
+      const seatUse = (oid, cid) => (enrollments || [])
+        .filter(e => e.org_id === oid && e.course_id === cid).length;
+
+      // ---- platform-wide attention banner ----
+      const today = new Date(); today.setHours(0,0,0,0);
+      const expSoon = (licenses || []).filter(l => {
+        if (!l.expires_on) return false;
+        const d = Math.round((new Date(l.expires_on) - today) / 86400000);
+        return d >= 0 && d <= 30;
+      });
+      const seatWarn = (licenses || []).filter(l =>
+        l.seats && seatUse(l.org_id, l.course_id) >= l.seats * 0.8);
+      const attention = (expSoon.length || seatWarn.length) ? `
+        <div class="attention">${icon("alert-triangle")} <b>${t2("needs_attention")}</b>
+          <ul>
+            ${expSoon.map(l => `<li>${expSoon.length} ${t2("alert_lic_expiring")} <b>${esc(orgName(l.org_id))}</b> — ${esc(cTitle(l.course_id))} (${esc(l.expires_on)})</li>`).join("")}
+            ${seatWarn.map(l => `<li>${t2("alert_seats_full")} <b>${esc(orgName(l.org_id))}</b> — ${esc(cTitle(l.course_id))} (${seatUse(l.org_id, l.course_id)}/${l.seats})</li>`).join("")}
+          </ul>
+        </div>` : "";
+
+      const orgCard = o => {
+        const members = membersOf(o.id);
+        const admins = members.filter(p => p.role === "admin");
+        const teachers = members.filter(p => p.role === "teacher");
+        const students = members.filter(p => p.role === "student");
+        const staff = [...admins, ...teachers];
+        const myLics = (licenses || []).filter(l => l.org_id === o.id);
+        const myTcs = (tcs || []).filter(t => t.org_id === o.id);
+        const tOptions = teachers.map(p => `<option value="${p.id}">${esc(nameOf(p))}</option>`).join("");
+        const licOptions = myLics.map(l => `<option value="${l.course_id}">${esc(cTitle(l.course_id))}</option>`).join("");
+
+        const seatBar = l => {
+          if (!l.seats) return "";
+          const pct = Math.min(100, Math.round(seatUse(o.id, l.course_id) / l.seats * 100));
+          const cls = pct >= 100 ? "full" : (pct >= 80 ? "warn" : "");
+          return `<div class="seatbar ${cls}"><span style="width:${pct}%;"></span></div>`;
+        };
+
+        return `
+        <div class="card" style="border-top:4px solid ${o.suspended ? "var(--danger)" : "var(--gold)"};">
+          <div class="card-head">
+            <h2>${icon(o.kind === "individual" ? "user" : "building-2", 18)} ${esc(o.name)}
+              ${o.suspended ? `<span class="pill off">${t2("suspended").toLowerCase()}</span>` : ""}</h2>
+            <span class="kind">${o.kind === "individual" ? t2("teacher") : t2("org_admin")}</span>
+          </div>
+          <p class="kind" style="margin:0 0 0.6rem;">
+            ${admins.length} ${t2("org_admin").toLowerCase()} · ${teachers.length} ${t2("teachers").toLowerCase()} ·
+            ${students.length} ${t2("students").toLowerCase()}
+          </p>
+
+          ${staff.length ? `
+          <table class="stackable" style="margin-bottom:0.8rem;">
+            <thead><tr><th>${t2("people")}</th><th>${t2("role")}</th><th>${t2("actions")}</th></tr></thead>
+            <tbody>${staff.map(p => `
+              <tr>
+                <td data-th="${t2("people")}">${esc(nameOf(p))}<div class="kind">${esc(p.email || "")}</div></td>
+                <td data-th="${t2("role")}"><span class="pill done">${p.role === "admin" ? t2("org_admin") : t2("teacher")}</span></td>
+                <td style="white-space:nowrap;">
+                  <button class="ghost u-reset" data-id="${p.id}" data-name="${esc(nameOf(p))}">${icon("key-round")} ${t2("reset_pw")}</button>
+                  <button class="ghost u-del" data-id="${p.id}" data-name="${esc(nameOf(p))}"
+                          style="color:var(--danger); border-color:var(--danger);">${icon("trash-2")}</button>
+                </td>
+              </tr>`).join("")}</tbody>
+          </table>` : ""}
+
+          <h2 style="font-size:1rem;">${icon("book-open")} ${t2("licenses")}</h2>
+          ${myLics.map(l => `
+            <div class="lesson">
+              <div class="meta">
+                <div class="title">${esc(cTitle(l.course_id))}</div>
+                <span class="kind">${seatUse(o.id, l.course_id)}${l.seats ? " / " + l.seats : ""} ${t2("seats")} ·
+                  ${l.expires_on ? t2("valid_until") + " " + esc(l.expires_on) : t2("no_expiry")}</span>
+                ${seatBar(l)}
+              </div>
+              <button class="ghost lic-del" data-id="${l.id}"
+                      style="color:var(--danger); border-color:var(--danger);">${t2("revoke")}</button>
+            </div>`).join("") || `<p class="empty">${t2("no_licenses")}</p>`}
+
+          <div class="form-row" style="margin-top:0.6rem;">
+            <div class="field" style="max-width:220px;"><label>${t2("course")}</label>
+              <select class="lic-course" data-org="${o.id}">${courseOptions}</select></div>
+            <div class="field" style="max-width:110px;"><label>${t2("seats")}</label>
+              <input type="number" class="lic-seats" data-org="${o.id}" min="1" placeholder="∞" /></div>
+            <div class="field" style="max-width:170px;"><label>${t2("until")} (optional)</label>
+              <input type="date" class="lic-exp" data-org="${o.id}" /></div>
+            <button class="lic-add" data-org="${o.id}">${t2("assign")}</button>
+          </div>
+
+          <h2 style="font-size:1rem; margin-top:0.9rem;">${icon("user-plus")} ${t2("create_account")}</h2>
+          <div class="form-row">
+            <div class="field"><label>${t2("email")}</label><input class="na-email" data-org="${o.id}" /></div>
+            <div class="field" style="max-width:160px;"><label>${t2("password")}</label>
+              <input class="na-pass" data-org="${o.id}" placeholder="${t2("pw_min6")}" /></div>
+            <div class="field"><label>${t2("full_name")}</label><input class="na-name" data-org="${o.id}" /></div>
+            <div class="field" style="max-width:150px;"><label>${t2("role")}</label>
+              <select class="na-role" data-org="${o.id}">
+                ${o.kind === "individual"
+                  ? `<option value="teacher">${t2("teacher")}</option>`
+                  : `<option value="admin">${t2("org_admin")}</option><option value="teacher">${t2("teacher")}</option>`}
+              </select></div>
+            <button class="na-add" data-org="${o.id}">${t2("create")}</button>
+          </div>
+          <label style="font-size:0.85rem; color:var(--muted); cursor:pointer; display:block; margin-top:0.4rem;">
+            <input type="checkbox" class="na-invite" data-org="${o.id}" /> ${t2("invite_instead")}
+          </label>
+
+          ${teachers.length ? `
+          <h2 style="font-size:1rem; margin-top:0.9rem;">${icon("graduation-cap")} ${t2("assign_title")}</h2>
+          ${myTcs.map(t => `
+            <div class="lesson">
+              <div class="meta"><div class="title">${esc(nameOf(members.find(p => p.id === t.teacher_id)))}</div>
+                <span class="kind">${esc(cTitle(t.course_id))}</span></div>
+              <button class="ghost tc-del" data-t="${t.teacher_id}" data-c="${t.course_id}">${t2("remove")}</button>
+            </div>`).join("") || `<p class="empty">${t2("no_assignments")}</p>`}
+          <div class="form-row" style="margin-top:0.4rem;">
+            <div class="field" style="max-width:220px;"><label>${t2("teacher")}</label>
+              <select class="tc-teacher" data-org="${o.id}">${tOptions}</select></div>
+            <div class="field" style="max-width:220px;"><label>${t2("course")}</label>
+              <select class="tc-course" data-org="${o.id}">${licOptions || `<option value="">${t2("no_courses")}</option>`}</select></div>
+            <button class="tc-add" data-org="${o.id}">${t2("assign")}</button>
+          </div>` : ""}
+
+          <div style="margin-top:0.9rem; border-top:1px solid var(--line); padding-top:0.6rem;">
+            <button class="ghost org-susp" data-id="${o.id}"
+              ${o.suspended ? "" : 'style="color:var(--danger); border-color:var(--danger);"'}>
+              ${o.suspended ? "▶ " + t2("reactivate") : "⏸ " + t2("suspend")}</button>
+          </div>
+        </div>`;
+      };
+
+      app.innerHTML = `
+        <p class="eyebrow">${t2("organizations")}</p>
+        <h1>${t2("organizations")} &amp; ${t2("licenses").toLowerCase()}</h1>
+        ${attention}
+
+        <div class="card">
+          <div class="card-head"><h2>${icon("plus-circle", 18)} ${t2("create")}</h2></div>
+          <div class="form-row">
+            <div class="field"><label>${t2("full_name")}</label><input id="o-name" placeholder="ABC Language Center / Ms Lan" /></div>
+            <div class="field" style="max-width:230px;"><label>${t2("role")}</label>
+              <select id="o-kind">
+                <option value="center">🏢 Center / school</option>
+                <option value="individual">👤 ${t2("teacher")}</option>
+              </select></div>
+            <button id="o-add">${t2("create")}</button>
+          </div>
+        </div>
+
+        ${(orgs || []).map(orgCard).join("") || `<p class="empty">${t2("no_enrollments")}</p>`}
+        <footer class="hub-footer">Learning Ecology · Thầy Lê Quốc Thông</footer>`;
+
+      // ---- wiring ----
+      const el = (cls, org) => app.querySelector(`.${cls}[data-org="${org}"]`);
+
+      document.getElementById("o-add").addEventListener("click", async () => {
+        const name = document.getElementById("o-name").value.trim();
+        const kind = document.getElementById("o-kind").value;
+        if (!name) { toast(t2("need_email"), "err"); return; }
+        const { error } = await sb.from("organizations").insert({ name, kind });
+        if (error) { toast(t2("err_create") + error.message, "err"); return; }
+        toast(t2("created_ok"));
+        rerender(render);
+      });
+
+      app.querySelectorAll(".lic-add").forEach(btn => btn.addEventListener("click", async () => {
+        const org = btn.getAttribute("data-org");
+        const course_id = el("lic-course", org).value;
+        const seats = parseInt(el("lic-seats", org).value, 10) || null;
+        const expires_on = el("lic-exp", org).value || null;
+        const { error } = await sb.from("course_licenses")
+          .insert({ org_id: org, course_id, seats, expires_on });
+        if (error) {
+          toast(error.code === "23505" ? t2("already_assigned") : t2("err_save") + error.message, "err");
+          return;
+        }
+        toast(t2("assigned_ok"));
+        rerender(render);
+      }));
+      app.querySelectorAll(".lic-del").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({ title: t2("revoke_lic_title"), body: t2("revoke_lic_body"),
+                                   okText: t2("revoke"), danger: true })) return;
+        const { error } = await sb.from("course_licenses").delete().eq("id", btn.getAttribute("data-id"));
+        if (error) { toast(t2("err_delete") + error.message, "err"); return; }
+        toast(t2("removed_ok"));
+        rerender(render);
+      }));
+
+      app.querySelectorAll(".na-add").forEach(btn => btn.addEventListener("click", async () => {
+        const org = btn.getAttribute("data-org");
+        const email = el("na-email", org).value.trim();
+        const password = el("na-pass", org).value;
+        const full_name = el("na-name", org).value.trim() || null;
+        const role = el("na-role", org).value;
+        const invite = el("na-invite", org).checked;
+        if (!email || (!invite && password.length < 6)) { toast(t2("need_email_pw"), "err"); return; }
+        btn.disabled = true;
+        try {
+          await callFn({ action: "create", email, password, full_name, role, org_id: org,
+                         invite, redirect: new URL("reset.html", location.href).href });
+          toast(invite ? t2("invited_ok") : t2("created_ok"));
+          rerender(render);
+        } catch (err) { toast(t2("err_create") + err.message, "err"); btn.disabled = false; }
+      }));
+
+      app.querySelectorAll(".tc-add").forEach(btn => btn.addEventListener("click", async () => {
+        const org = btn.getAttribute("data-org");
+        const teacher_id = el("tc-teacher", org).value;
+        const course_id = el("tc-course", org).value;
+        if (!teacher_id || !course_id) { toast(t2("pick_teacher_course"), "err"); return; }
+        const { error } = await sb.from("teacher_courses").insert({ teacher_id, course_id, org_id: org });
+        if (error) {
+          toast(error.code === "23505" ? t2("already_assigned") : t2("err_save") + error.message, "err");
+          return;
+        }
+        toast(t2("assigned_ok"));
+        rerender(render);
+      }));
+      app.querySelectorAll(".tc-del").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({ title: t2("remove_asgn_title"), body: t2("remove_asgn_body"),
+                                   okText: t2("remove"), danger: true })) return;
+        const { error } = await sb.from("teacher_courses").delete()
+          .eq("teacher_id", btn.getAttribute("data-t"))
+          .eq("course_id", btn.getAttribute("data-c"));
+        if (error) { toast(t2("err_delete") + error.message, "err"); return; }
+        toast(t2("removed_ok"));
+        rerender(render);
+      }));
+
+      app.querySelectorAll(".u-reset").forEach(btn => btn.addEventListener("click", async () => {
+        const pw = await promptDialog({ title: t2("reset_pw") + " — " + btn.getAttribute("data-name"),
+                                        label: t2("new_password"), placeholder: t2("pw_min6") });
+        if (pw === null) return;
+        if (pw.length < 6) { toast(t2("need_email_pw"), "err"); return; }
+        try {
+          await callFn({ action: "reset-password", user_id: btn.getAttribute("data-id"), new_password: pw });
+          toast(t2("reset_pw_ok"));
+        } catch (err) { toast(t2("err_generic") + err.message, "err"); }
+      }));
+      app.querySelectorAll(".u-del").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({
+          title: t2("del_user_title") + " (" + btn.getAttribute("data-name") + ")",
+          body: t2("del_user_body"), okText: t2("delete_"), danger: true })) return;
+        try {
+          await callFn({ action: "delete", user_id: btn.getAttribute("data-id") });
+          toast(t2("deleted_ok"));
+          rerender(render);
+        } catch (err) { toast(t2("err_delete") + err.message, "err"); }
+      }));
+
+      app.querySelectorAll(".org-susp").forEach(btn => btn.addEventListener("click", async () => {
+        const o = (orgs || []).find(x => x.id === btn.getAttribute("data-id"));
+        if (!o.suspended && !await confirmDialog({ title: t2("suspend_title"),
+                                                   okText: t2("suspend"), danger: true })) return;
+        const { error } = await sb.from("organizations")
+          .update({ suspended: !o.suspended }).eq("id", o.id);
+        if (error) { toast(t2("err_save") + error.message, "err"); return; }
+        toast(t2("saved_ok"));
+        rerender(render);
+      }));
+
+      refreshIcons();
+    }
+
+    start();
+  </script>
+  <script>
+    // PWA: offline shell + installability (needs HTTPS, e.g. GitHub Pages)
+    if ("serviceWorker" in navigator && location.protocol === "https:")
+      navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>

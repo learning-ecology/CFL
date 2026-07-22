@@ -1,0 +1,2066 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shadow Chinese — Luyện nói theo video 跟读 · Learning Ecology</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+  /* ---- module guard ----------------------------------------------------
+     This feature can be switched off per installation (Dashboard →
+     Tính năng). Students are sent back to the dashboard; the owner keeps
+     access so they can preview. Fails OPEN if app_modules is absent, so
+     the page keeps working on databases without migration38. */
+  (async function () {
+    try {
+      var res = await sb.from("app_modules").select("shadow").eq("id", 1)
+                  .maybeSingle().then(function (r) { return r; }, function () { return null; });
+      if (!res || res.error || !res.data || res.data.shadow !== false) return;
+      var s = await sb.auth.getSession();
+      var uid = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+      if (!uid) return;                       // login redirect handles it
+      var p = await sb.from("profiles").select("role").eq("id", uid).single();
+      if (p && p.data && p.data.role === "owner") return;   // owner may preview
+      location.replace("dashboard.html");
+    } catch (e) { /* never block the page on an unexpected error */ }
+  })();
+  </script>
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.26.0/dist/index.min.js"></script>
+<style>
+  :root {
+    --bg:#f4f6fb; --panel:#fff; --ink:#1c2740; --muted:#64708a; --line:#dfe4ef;
+    --accent:#1d5fc2; --accent-soft:#e8f0fe; --ok:#178a4c; --warn:#c05600;
+    --chart:#2a78d6; --chart2:#7c3aad; --chart-grid:#e3e8f2;
+    --l1:#178a4c; --l1bg:#e2f4e9; --l2:#1d5fc2; --l2bg:#e4edfb;
+    --l3:#9a7b00; --l3bg:#faf3d0; --l4:#c05600; --l4bg:#fdeadc;
+    --l5:#c62f2f; --l5bg:#fde3e3; --l6:#7c3aad; --l6bg:#f1e5fb;
+    --hz:24px; --py:13px; --tr:14px;
+    --hz-font:"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#10141f; --panel:#1a2130; --ink:#e8ecf5; --muted:#93a0b8; --line:#2c3549;
+      --accent:#6ea8ff; --accent-soft:#1e2c47; --ok:#4cc98a; --warn:#ffb066;
+      --chart:#3987e5; --chart2:#cfa0f0; --chart-grid:#2c3549;
+      --l1:#4cc98a; --l1bg:#173226; --l2:#6ea8ff; --l2bg:#1c2b47;
+      --l3:#e8c74a; --l3bg:#33301a; --l4:#ffa05e; --l4bg:#38281c;
+      --l5:#ff7b7b; --l5bg:#3a2020; --l6:#cfa0f0; --l6bg:#30203f;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif; }
+  a { color:var(--accent); }
+  button { border:1px solid var(--line); background:var(--panel); color:var(--ink);
+           border-radius:8px; padding:7px 13px; font-size:14px; cursor:pointer; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary:hover { filter:brightness(1.1); color:#fff; }
+  button.small { padding:4px 9px; font-size:12.5px; border-radius:6px; }
+  button.on { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  input, select, textarea { border:1px solid var(--line); background:var(--panel); color:var(--ink);
+           border-radius:8px; padding:7px 10px; font-size:14px; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); border-color:transparent; }
+  textarea { width:100%; resize:vertical; line-height:1.6; font-family:inherit; }
+
+  header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 18px;
+           display:flex; align-items:center; gap:14px; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
+  header h1 { margin:0; font-size:18px; white-space:nowrap; }
+  header h1 span { color:var(--accent); }
+  nav { display:flex; gap:4px; flex-wrap:wrap; }
+  nav button { border:none; background:none; padding:7px 12px; border-radius:8px; font-size:14px; color:var(--muted); }
+  nav button.active { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+
+  main { max-width:1240px; margin:0 auto; padding:16px 18px 70px; }
+  .view { display:none; }
+  .view.active { display:block; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  .grow { flex:1; }
+  h2 { font-size:17px; margin:4px 0 12px; }
+  h3 { font-size:15px; margin:2px 0 10px; }
+  .mutetext { color:var(--muted); font-size:13px; }
+  .offline { color:var(--warn); }
+
+  .lv { display:inline-block; font-size:11.5px; font-weight:700; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+  .lv1 { color:var(--l1); background:var(--l1bg); } .lv2 { color:var(--l2); background:var(--l2bg); }
+  .lv3 { color:var(--l3); background:var(--l3bg); } .lv4 { color:var(--l4); background:var(--l4bg); }
+  .lv5 { color:var(--l5); background:var(--l5bg); } .lv6 { color:var(--l6); background:var(--l6bg); }
+  .lv0 { color:var(--muted); background:var(--bg); }
+  .chip { border:1px solid var(--line); background:var(--panel); border-radius:16px; padding:4px 12px; font-size:13px; cursor:pointer; }
+  .chip.active { background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
+
+  /* library */
+  .libgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+  .vcard { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+           cursor:pointer; transition:box-shadow .15s, transform .15s; position:relative; }
+  .vcard:hover { box-shadow:0 6px 18px rgba(0,0,0,.12); transform:translateY(-2px); }
+  .vcard.locked { opacity:.68; }
+  .vcard img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:#000; }
+  .vcard .body { padding:10px 12px; }
+  .vcard h3 { margin:0 0 6px; font-size:14.5px; line-height:1.35; }
+  .vcard .meta { display:flex; gap:6px; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--muted); }
+  .vcard .done { position:absolute; top:8px; right:10px; background:var(--ok); color:#fff;
+                 border-radius:8px; padding:1px 8px; font-size:12px; font-weight:700; }
+  .vcard .dur { position:absolute; top:8px; left:10px; background:rgba(0,0,0,.72); color:#fff;
+                border-radius:6px; padding:0 6px; font-size:11.5px; }
+
+  /* practice layout */
+  .pgrid { display:grid; grid-template-columns:minmax(0,11fr) minmax(0,9fr); gap:14px; align-items:start; }
+  @media (max-width: 980px) { .pgrid { grid-template-columns:1fr; } }
+  .videobox { position:relative; padding-top:56.25%; border-radius:12px; overflow:hidden; background:#000; }
+  .videobox iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .shadowbar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; padding:10px 12px;
+               background:var(--panel); border:1px solid var(--line); border-radius:12px; margin-top:10px; font-size:13px; }
+  .shadowbar .group { display:inline-flex; align-items:center; gap:6px; color:var(--muted); }
+  .shadowbar select { padding:4px 6px; font-size:13px; }
+  .toggle { display:inline-flex; align-items:center; gap:5px; cursor:pointer; color:var(--muted); font-size:13px; white-space:nowrap; }
+
+  #waitBox { margin-top:10px; background:var(--accent-soft); border:1px solid var(--accent);
+             border-radius:12px; padding:12px 14px; }
+  #waitBox .big { font-weight:700; color:var(--accent); }
+  #waitCue { font-family:var(--hz-font); font-size:20px; margin:6px 0; }
+  .waitbar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:8px 0; }
+  #waitBarFill { height:100%; width:0%; background:var(--accent); transition:width .2s linear; }
+
+  #recPanel { margin-top:10px; background:var(--panel); border:1px dashed var(--line); border-radius:12px; padding:12px 14px; }
+  #recPanel.recording { border-color:var(--l5); }
+  .recdot { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--l5);
+            margin-right:6px; animation:blink 1s infinite; vertical-align:middle; }
+  @keyframes blink { 50% { opacity:.25; } }
+  #recResult .hit { color:var(--ok); font-weight:600; }
+  #recResult .miss { color:var(--l5); text-decoration:underline dotted; }
+  #recScore { font-size:15px; margin-top:6px; }
+  #recScore b { font-size:22px; }
+
+  /* subtitles */
+  .subtools { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; padding:10px 12px;
+              background:var(--panel); border:1px solid var(--line); border-radius:12px; margin-bottom:10px; font-size:13px; }
+  .subtools select { padding:4px 6px; font-size:13px; }
+  #subList { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+             max-height:calc(100vh - 230px); min-height:220px; overflow-y:auto; padding:6px 0; }
+  @media (max-width: 980px) { #subList { max-height:46vh; } }
+  .cue { padding:8px 14px 8px 11px; border-left:3px solid transparent; cursor:pointer; }
+  .cue:hover { background:var(--bg); }
+  .cue.active { background:var(--accent-soft); border-left-color:var(--accent); }
+  .cue .time { font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .cue .ops { visibility:hidden; display:inline-flex; gap:2px; }
+  .cue:hover .ops, .cue.active .ops { visibility:visible; }
+  .cue .ops button { border:none; background:none; padding:1px 5px; font-size:13px; border-radius:6px; }
+  .cue .ops button:hover { background:var(--accent-soft); }
+  .cue .ops button.mark { color:var(--warn); }
+  .zhline { line-height:1.25; margin:2px 0; }
+  .trline { font-size:var(--tr); color:var(--muted); margin-top:1px; }
+  .tok { display:inline-block; text-align:center; margin:0 1px; vertical-align:bottom; border-radius:6px; }
+  .tok.zh { cursor:pointer; }
+  .tok.zh:hover { background:var(--accent-soft); }
+  .tok .py { display:block; font-size:var(--py); color:var(--muted); line-height:1.15; min-height:calc(var(--py) * 1.15); }
+  .tok .hz { display:block; font-size:var(--hz); font-family:var(--hz-font); line-height:1.3; }
+  .tok.l1 .hz { border-bottom:2px solid var(--l1); } .tok.l2 .hz { border-bottom:2px solid var(--l2); }
+  .tok.l3 .hz { border-bottom:2px solid var(--l3); } .tok.l4 .hz { border-bottom:2px solid var(--l4); }
+  .tok.l5 .hz { border-bottom:2px solid var(--l5); } .tok.l6 .hz { border-bottom:2px solid var(--l6); }
+  .tok.saved .hz { background:var(--l3bg); border-radius:4px; }
+  /* pinyin display modes */
+  #subList.py-off .tok .py { display:none; }
+  #subList.py-hover .tok .py { visibility:hidden; }
+  #subList.py-hover .tok:hover .py { visibility:visible; }
+  #subList.py-click .tok .py { visibility:hidden; }
+  #subList.py-click .tok.pyon .py { visibility:visible; }
+  #subList.tr-off .trline { display:none; }
+  /* listening-challenge mode: text hidden until revealed */
+  #subList.chal .cue:not(.revealed) .zhline,
+  #subList.chal .cue:not(.revealed) .trline { filter:blur(8px); user-select:none; }
+  #subList.chal .cue:not(.revealed) .time::after { content:"👁 bấm 2 lần để hiện"; color:var(--warn); }
+  .cue mark { background:var(--l3bg); color:inherit; border-radius:3px; }
+
+  /* practice bottom tabs */
+  .ptabs { display:flex; gap:4px; margin:14px 0 10px; flex-wrap:wrap; }
+  .ptabs button { border:none; background:none; padding:7px 12px; border-radius:8px; color:var(--muted); }
+  .ptabs button.active { background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .ppanel { display:none; }
+  .ppanel.active { display:block; }
+  .anatable { width:100%; border-collapse:collapse; font-size:14px; }
+  .anatable td { border-top:1px solid var(--line); padding:6px 8px; vertical-align:top; }
+  .anatable td.w { font-family:var(--hz-font); font-size:19px; white-space:nowrap; }
+  .bmkrow { display:flex; gap:10px; align-items:flex-start; padding:8px 4px; border-top:1px solid var(--line); }
+  .bmkrow:first-child { border-top:none; }
+  .bmkrow .zh { font-family:var(--hz-font); font-size:17px; cursor:pointer; }
+  .bmkrow .note { color:var(--muted); font-size:13px; white-space:pre-wrap; }
+
+  /* vocab view */
+  .vword { display:flex; gap:12px; align-items:flex-start; padding:10px 4px; border-top:1px solid var(--line); }
+  .vword:first-child { border-top:none; }
+  .vword .w { font-family:var(--hz-font); font-size:24px; min-width:60px; }
+  .vword .p { color:var(--accent); }
+  .vword .note { color:var(--warn); font-size:13px; }
+  .vword .ex { color:var(--muted); font-size:13px; font-family:var(--hz-font); }
+  .status { font-size:11px; border-radius:6px; padding:1px 6px; }
+  .status.new { background:var(--accent-soft); color:var(--accent); }
+  .status.learning { background:var(--l3bg); color:var(--l3); }
+  .status.known { background:var(--l1bg); color:var(--l1); }
+
+  /* stats */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:14px; }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .tile b { display:block; font-size:22px; }
+  .tile span { color:var(--muted); font-size:12.5px; }
+  .chart { display:flex; align-items:flex-end; gap:4px; height:130px; padding:6px 2px 0; }
+  .chart .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; height:100%; gap:0; cursor:default; }
+  .chart .col .seg1 { background:var(--chart); border-radius:3px 3px 0 0; min-height:0; }
+  .chart .col .seg2 { background:var(--chart2); border-radius:0; }
+  .chart .col .lbl { font-size:10px; color:var(--muted); text-align:center; margin-top:3px; }
+  .goalbar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:4px 0 10px; }
+  .goalbar div { height:100%; background:var(--ok); }
+  .badges { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; }
+  .bdg { text-align:center; background:var(--bg); border:1px solid var(--line); border-radius:10px;
+         padding:10px 6px; opacity:.35; font-size:12px; }
+  .bdg.earn { opacity:1; background:var(--l3bg); border-color:var(--l3); }
+  .bdg .ico { font-size:22px; display:block; }
+
+  /* admin */
+  .admrow { display:flex; gap:10px; align-items:center; padding:8px 4px; border-top:1px solid var(--line); flex-wrap:wrap; }
+  .admrow:first-child { border-top:none; }
+  .admrow img { width:80px; border-radius:6px; }
+
+  #popup { position:fixed; display:none; background:var(--panel); border:1px solid var(--line);
+           border-radius:12px; padding:12px 36px 12px 14px; box-shadow:0 12px 34px rgba(0,0,0,.28);
+           z-index:120; max-width:min(330px, 92vw); }
+  #popup .w { font-family:var(--hz-font); font-size:26px; margin-right:8px; }
+  #popup .p { color:var(--accent); font-size:15px; margin-right:8px; }
+  #popup .m { margin:6px 0 2px; }
+  #popup .ex { color:var(--muted); font-family:var(--hz-font); font-size:13.5px; margin-top:4px; }
+  #popup .close { position:absolute; top:6px; right:6px; border:none; background:none; font-size:15px; color:var(--muted); }
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
+           background:var(--ink); color:var(--bg); border-radius:10px; padding:9px 18px; font-size:14px;
+           opacity:0; pointer-events:none; transition:.25s; z-index:200; max-width:88vw; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Shadow <span>Chinese</span> <small class="mutetext">跟读</small></h1>
+  <nav>
+    <button id="navLib" class="active">🎬 Thư viện</button>
+    <button id="navPractice">▶ Luyện tập</button>
+    <button id="navVocab">📒 Từ vựng</button>
+    <button id="navStats">📊 Thống kê</button>
+    <button id="navAdmin" hidden>⚙️ Quản lý</button>
+  </nav>
+  <div class="grow"></div>
+  <span id="whoami" class="mutetext"></span>
+  <a href="dashboard.html" class="mutetext">← Trang học</a>
+</header>
+
+<main>
+
+<!-- ==================== LIBRARY ==================== -->
+<section id="view-lib" class="view active">
+  <div class="panel">
+    <h2>➕ Nạp video YouTube</h2>
+    <div class="row">
+      <input id="impUrl" class="grow" placeholder="Dán link video YouTube có phụ đề tiếng Trung… (youtube.com/watch?v=…)" >
+      <button id="btnLoadUrl" class="primary">Nạp video</button>
+    </div>
+    <div id="impStatus" class="mutetext" style="margin-top:8px"></div>
+  </div>
+
+  <div id="impPanel" class="panel" hidden>
+    <div class="row" style="align-items:flex-start">
+      <img id="impThumb" style="width:168px;border-radius:8px" alt="">
+      <div class="grow">
+        <div class="row"><input id="impTitle" class="grow" placeholder="Tên video"></div>
+        <div class="row" style="margin-top:8px">
+          <span class="mutetext">Cấp độ:</span>
+          <select id="impLevel">
+            <option value="0">Chưa xếp</option><option value="1">HSK 1</option><option value="2">HSK 2</option>
+            <option value="3">HSK 3</option><option value="4">HSK 4</option><option value="5">HSK 5</option><option value="6">HSK 6</option>
+          </select>
+          <label class="toggle" id="impPubWrap" hidden><input type="checkbox" id="impPub" checked> Chia sẻ cho mọi học viên</label>
+          <span class="group" id="impTierWrap" hidden><span class="mutetext">Gói:</span>
+            <select id="impTier"><option value="free">Free</option><option value="premium">👑 Premium</option></select></span>
+        </div>
+      </div>
+    </div>
+    <div id="subFetchStatus" class="mutetext" style="margin:10px 0 6px"></div>
+    <div id="autoResult" hidden>
+      <div class="row">
+        <span id="autoInfo"></span>
+        <span class="mutetext">Dịch nghĩa:</span>
+        <select id="autoTrLang"><option value="vi">Tiếng Việt</option><option value="en">English</option><option value="">Không</option></select>
+        <button id="btnUseAuto" class="primary">✓ Dùng phụ đề này</button>
+      </div>
+    </div>
+    <details id="manualBox" style="margin-top:10px">
+      <summary class="mutetext" style="cursor:pointer">📋 Hoặc dán phụ đề thủ công (bản chép lời YouTube / SRT / VTT)</summary>
+      <div class="mutetext" style="margin-top:8px">💡 Cách nhanh nhất: trên YouTube mở phần mô tả video → <b>Show transcript / Hiện bản chép lời</b> → bôi đen toàn bộ → copy → dán vào ô dưới (dạng <code>0:07</code> rồi dòng chữ — dán được nguyên văn). Tệp SRT/VTT cũng dùng được.</div>
+      <div class="row" style="margin-top:8px;align-items:flex-start">
+        <div class="grow">
+          <div class="mutetext">Phụ đề tiếng Trung (bắt buộc) — hoặc chọn tệp: <input type="file" id="subFileZh" accept=".srt,.vtt,.txt"></div>
+          <textarea id="subPasteZh" rows="6" placeholder="0:07&#10;大家好&#10;0:08&#10;欢迎来到我的频道&#10;&#10;— hoặc SRT —&#10;1&#10;00:00:01,000 --> 00:00:03,500&#10;你好！"></textarea>
+        </div>
+        <div class="grow">
+          <div class="mutetext">Bản dịch (không bắt buộc) — cùng định dạng, tiếng Việt hoặc Anh: <input type="file" id="subFileTr" accept=".srt,.vtt,.txt"></div>
+          <textarea id="subPasteTr" rows="6" placeholder="0:07&#10;Chào mọi người&#10;0:08&#10;Chào mừng đến với kênh của mình"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px"><button id="btnUseManual">✓ Dùng phụ đề đã dán</button><span id="manualInfo" class="mutetext"></span></div>
+    </details>
+    <div class="row" style="margin-top:12px">
+      <button id="btnSaveVideo" class="primary" disabled>💾 Lưu &amp; luyện tập</button>
+      <button id="btnCancelImport">Hủy</button>
+      <span id="impSaveInfo" class="mutetext"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🎬 Thư viện video</h2>
+    <div class="row" style="margin-bottom:12px">
+      <div id="lvChips" class="row" style="gap:6px"></div>
+      <div class="grow"></div>
+      <input id="libSearch" placeholder="🔍 Tìm video…" style="min-width:170px">
+    </div>
+    <div id="libGrid" class="libgrid"></div>
+    <div id="libEmpty" class="mutetext" hidden>Chưa có video nào — dán một link YouTube ở trên để bắt đầu. Gợi ý kênh có phụ đề tiếng Trung: 李子柒, 阿木爷爷, Easy Mandarin, Mandarin Corner…</div>
+  </div>
+</section>
+
+<!-- ==================== PRACTICE ==================== -->
+<section id="view-practice" class="view">
+  <div id="noVideo" class="panel mutetext">Chưa chọn video — hãy chọn một video trong 🎬 Thư viện, hoặc dán link YouTube mới.</div>
+  <div id="practiceWrap" hidden>
+    <div class="row" style="margin-bottom:10px">
+      <button id="btnBackLib" class="small">← Thư viện</button>
+      <b id="prTitle" style="font-size:16px"></b>
+      <span id="prLv" class="lv lv0"></span>
+      <div class="grow"></div>
+      <button id="btnMarkDone" class="small">✓ Đánh dấu đã hoàn thành</button>
+    </div>
+    <div class="pgrid">
+      <div class="pleft">
+        <div class="videobox"><div id="ytMount"></div></div>
+        <div class="shadowbar">
+          <span class="group">Chế độ
+            <select id="pMode">
+              <option value="normal">▶ Nghe liên tục</option>
+              <option value="shadow">🎙 Shadowing từng câu</option>
+            </select></span>
+          <span class="group">Lặp mỗi câu
+            <select id="pReps"><option value="1">1 lần</option><option value="2">2 lần</option><option value="3">3 lần</option><option value="99">∞</option></select></span>
+          <span class="group">Chờ nói theo
+            <select id="pGap"><option value="1">ngắn (1×)</option><option value="1.5">vừa (1.5×)</option><option value="2.2">dài (2×)</option><option value="0">⏸ chờ tôi bấm</option></select></span>
+          <span class="group">Tốc độ <span id="speedBtns"></span></span>
+        </div>
+        <div id="waitBox" hidden>
+          <span class="big">🎙 Đến lượt bạn — nói theo!</span> <span id="waitRepInfo" class="mutetext"></span>
+          <div id="waitCue"></div>
+          <div class="waitbar"><div id="waitBarFill"></div></div>
+          <div class="row">
+            <button id="btnWaitReplay" class="small">↺ Nghe lại câu</button>
+            <button id="btnWaitSlow" class="small">🐢 Đọc chậm (AI)</button>
+            <button id="btnWaitRec" class="small">🎙 Ghi âm &amp; chấm</button>
+            <button id="btnWaitNext" class="small primary">▶ Câu tiếp</button>
+          </div>
+        </div>
+        <div id="recPanel" hidden>
+          <div class="row">
+            <b>🎙 Luyện phát âm</b>
+            <span id="recTarget" class="mutetext" style="font-family:var(--hz-font)"></span>
+            <div class="grow"></div>
+            <button id="recClose" class="small">✕</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button id="btnRecStart" class="small primary">🎙 Bắt đầu ghi</button>
+            <button id="btnRecStop" class="small" hidden><span class="recdot"></span>⏹ Dừng</button>
+            <button id="btnRecPlay" class="small" disabled>▶ Nghe bản của tôi</button>
+            <button id="btnRecOrig" class="small">▶ Nghe bản gốc</button>
+          </div>
+          <div id="recStatus" class="mutetext" style="margin-top:6px"></div>
+          <div id="recResult" style="margin-top:6px;font-family:var(--hz-font);font-size:18px"></div>
+          <div id="recScore"></div>
+        </div>
+      </div>
+      <div class="pright">
+        <div class="subtools">
+          <select id="pPreset" title="Chế độ hiển thị">
+            <option value="beginner">🌱 Sơ cấp (pinyin + nghĩa)</option>
+            <option value="inter">🌿 Trung cấp (pinyin khi bấm)</option>
+            <option value="adv">🌳 Cao cấp (chỉ chữ Hán)</option>
+            <option value="custom">⚙️ Tùy chỉnh</option>
+          </select>
+          <select id="pPy" title="Pinyin">
+            <option value="all">Pinyin: hiện</option>
+            <option value="hover">Pinyin: rê chuột</option>
+            <option value="click">Pinyin: bấm từng từ</option>
+            <option value="off">Pinyin: ẩn</option>
+          </select>
+          <label class="toggle"><input type="checkbox" id="pTr" checked> Nghĩa</label>
+          <label class="toggle" title="Ẩn chữ, luyện nghe trước rồi mới hiện"><input type="checkbox" id="pChal"> 🎧 Thử thách nghe</label>
+          <label class="toggle"><input type="checkbox" id="pScroll" checked> Tự cuộn</label>
+          <span class="group">A<input type="range" id="pFont" min="18" max="40" step="1" style="width:70px"></span>
+          <input id="pSearch" placeholder="🔍 chữ / pinyin / nghĩa" style="min-width:130px" class="grow">
+        </div>
+        <div id="subList"></div>
+      </div>
+    </div>
+    <div class="ptabs">
+      <button id="tabAna" class="active">🔎 Phân tích câu</button>
+      <button id="tabBmk">🔖 Đánh dấu <span id="bmkCount" class="mutetext"></span></button>
+      <button id="tabNote">📝 Ghi chú</button>
+    </div>
+    <div id="panelAna" class="ppanel active panel"><div class="mutetext">Bấm nút 🔎 ở một câu (hoặc để video chạy) — từng từ trong câu sẽ được phân tích ở đây: từ loại HSK, pinyin, nghĩa.</div><div id="anaBody"></div></div>
+    <div id="panelBmk" class="ppanel panel"><div id="bmkList" class="mutetext">Chưa có câu nào được đánh dấu — bấm 🔖 ở câu bạn muốn xem lại.</div></div>
+    <div id="panelNote" class="ppanel panel"><div id="noteList" class="mutetext">Chưa có ghi chú — bấm 📝 ở một câu để ghi chú ngữ pháp, cách dịch…</div></div>
+  </div>
+</section>
+
+<!-- ==================== VOCAB ==================== -->
+<section id="view-vocab" class="view">
+  <div class="panel">
+    <div class="row">
+      <h2 style="margin:0">📒 Từ vựng của tôi</h2>
+      <span id="vCount" class="mutetext"></span>
+      <div class="grow"></div>
+      <a href="reading.html" class="mutetext">🃏 Ôn thẻ nhớ (trong Đọc hiểu HSK) →</a>
+    </div>
+    <div class="row" style="margin:10px 0">
+      <input id="vSearch" placeholder="🔍 Tìm từ…" class="grow" style="min-width:140px">
+      <select id="vLvl"><option value="0">Mọi cấp</option><option value="1">HSK 1</option><option value="2">HSK 2</option><option value="3">HSK 3</option><option value="4">HSK 4</option><option value="5">HSK 5</option><option value="6">HSK 6</option><option value="-1">Ngoài HSK</option></select>
+      <select id="vStatus"><option value="">Mọi trạng thái</option><option value="new">Mới</option><option value="learning">Đang học</option><option value="known">Đã thuộc</option></select>
+      <select id="vSort"><option value="date">Mới lưu trước</option><option value="dateAsc">Cũ trước</option><option value="level">Theo cấp HSK</option></select>
+    </div>
+    <div id="vList"></div>
+    <div id="vEmpty" class="mutetext" hidden>Chưa có từ nào — trong lúc luyện tập, bấm vào bất kỳ từ nào trong phụ đề rồi chọn 💾 Lưu từ. Từ vựng dùng chung với trang Đọc hiểu HSK.</div>
+  </div>
+</section>
+
+<!-- ==================== STATS ==================== -->
+<section id="view-stats" class="view">
+  <div id="statTiles" class="tiles"></div>
+  <div class="panel">
+    <h2>📈 14 ngày gần đây <span class="mutetext">(phút nghe <span style="color:var(--chart)">■</span> + phút shadowing <span style="color:var(--chart2)">■</span>)</span></h2>
+    <div id="statChart" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h2>🎯 Mục tiêu mỗi ngày</h2>
+    <div class="row">
+      <span class="group">⏱ Luyện <input type="number" id="gMin" min="0" max="600" style="width:70px"> phút/ngày</span>
+      <span class="group">📒 Lưu <input type="number" id="gWords" min="0" max="200" style="width:70px"> từ mới/ngày</span>
+      <button id="gSave" class="small primary">Lưu mục tiêu</button>
+    </div>
+    <div id="gToday" style="margin-top:10px"></div>
+  </div>
+  <div class="panel">
+    <h2>🏅 Huy hiệu</h2>
+    <div id="badgeGrid" class="badges"></div>
+  </div>
+</section>
+
+<!-- ==================== ADMIN ==================== -->
+<section id="view-admin" class="view">
+  <div class="panel">
+    <h2>⚙️ Quản lý thư viện video</h2>
+    <div class="mutetext" style="margin-bottom:8px">Video bạn hoặc giáo viên nạp và bật "Chia sẻ" sẽ hiện cho mọi học viên. Video học viên tự nạp là riêng tư (chỉ hiện ở đây để bạn theo dõi). Giọng đọc tự nhiên (Azure) cấu hình một lần trong trang <a href="reading.html">Đọc hiểu HSK</a> → 🔊 Giọng đọc và dùng chung cho trang này.</div>
+    <div id="admList"></div>
+  </div>
+</section>
+
+</main>
+
+<div id="popup"></div>
+<div id="toast"></div>
+
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const todayKey = (d) => { const x = d ? new Date(d) : new Date(); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
+/* per-account key namespacing (shared device safe). Vocabulary keys reuse the
+   SAME storage as reading.html ("crh-…") so both pages share one word library;
+   the HSK dictionary cache is global (same for everyone). */
+let uid = null, isStaff = false;
+const K = k => k === 'crh-dict-v1' ? k
+  : (k.indexOf('crh-') === 0 ? 'crh-' : 'csh-') + (uid ? uid.slice(0, 8) : 'anon') + '-' + k;
+function store(key, val) { try { localStorage.setItem(K(key), JSON.stringify(val)); } catch (e) { toast('⚠️ Bộ nhớ đầy'); } }
+function read(key, fb) { try { return JSON.parse(localStorage.getItem(K(key))) ?? fb; } catch (e) { return fb; } }
+let toastTimer = null;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600); }
+const escH = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtT = s => { s = Math.max(0, Math.round(s)); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); };
+const fmtH = s => s >= 3600 ? (s/3600).toFixed(1) + ' giờ' : Math.round(s/60) + ' phút';
+
+/* ================= hub account ================= */
+async function requireLogin() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = 'login.html'; return null; }
+  const user = session.user;
+  let prof = null;
+  try {
+    const { data } = await sb.from('profiles')
+      .select('full_name, role, active_session, multi_device, suspended, plan, premium_until').eq('id', user.id).single();
+    prof = data;
+  } catch (e) {}
+  if (prof && prof.suspended) { location.href = 'login.html'; return null; }
+  const device = localStorage.getItem('hub_device');
+  if (prof && prof.active_session && !prof.multi_device && device && prof.active_session !== device) {
+    location.href = 'login.html?kicked=1'; return null;
+  }
+  uid = user.id;
+  isStaff = !!prof && (prof.role === 'teacher' || prof.role === 'owner' || prof.role === 'admin');
+  const _td = new Date().toISOString().slice(0, 10);
+  isPremium = isStaff || (!!prof && prof.plan === 'premium' && (!prof.premium_until || prof.premium_until >= _td));
+  $('whoami').textContent = (prof && prof.full_name) || user.email || '';
+  if (isStaff) { $('navAdmin').hidden = false; $('impPubWrap').hidden = false; $('impTierWrap').hidden = false; }
+  return user;
+}
+
+/* ================= cloud: video library ================= */
+let VIDS = [];
+async function loadVideos() {
+  try {
+    const { data, error } = await sb.from('shadow_videos').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    VIDS = data;
+    store('vids-cache', VIDS.map(v => ({ ...v, subs: (v.subs || []).slice(0, 400) })));
+  } catch (e) { VIDS = read('vids-cache', []); }
+  freeOrderCache = null;
+}
+
+/* ================= access control (Free limit + 👑, like the Reading Hub) =================
+   Until migration28 runs, ACCESS_READY stays false and nothing is ever locked. */
+let isPremium = false, ACCESS_READY = false, GRANTS = [], FREE_LIMIT = 0, freeOrderCache = null;
+async function loadAccess() {
+  try {
+    /* no student filter: RLS returns this student's own grants PLUS
+       course-wide grants for every course they are enrolled in (migration29) */
+    const { data } = await sb.from('shadow_access').select('video_id, level');
+    GRANTS = data || [];
+  } catch (e) { GRANTS = []; }
+  try {
+    const { data } = await sb.from('shadow_settings').select('free_limit').eq('id', 1).maybeSingle();
+    if (data && typeof data.free_limit === 'number') { FREE_LIMIT = data.free_limit; ACCESS_READY = true; }
+  } catch (e) { /* migration28 not run yet → no locks */ }
+}
+function grantCovers(v) {
+  return GRANTS.some(g => g.video_id === v.id || (!g.video_id && (g.level == null || g.level === (v.level || 0))));
+}
+function freeRank(id) {
+  if (!freeOrderCache) {
+    freeOrderCache = VIDS.filter(x => x.published && x.tier !== 'premium')
+      .sort((a, b) => ((a.sort_order || 0) - (b.sort_order || 0)) || String(a.created_at).localeCompare(String(b.created_at)))
+      .map(x => x.id);
+  }
+  return freeOrderCache.indexOf(id);
+}
+function isLocked(v) {
+  if (!ACCESS_READY || isStaff || isPremium) return false;
+  if (v.created_by === uid) return false;             // own imports are never limited
+  if (grantCovers(v)) return false;
+  if (v.tier === 'premium') return true;
+  if (!FREE_LIMIT) return false;
+  return freeRank(v.id) >= FREE_LIMIT;
+}
+function showUpgrade(v) {
+  const reason = (v && v.tier === 'premium')
+    ? 'Video này thuộc gói Premium. Nâng cấp để mở khóa toàn bộ thư viện luyện nói.'
+    : 'Bạn đã dùng hết ' + FREE_LIMIT + ' video miễn phí. Nâng cấp Premium để luyện không giới hạn — hoặc nhờ giáo viên mở thêm video cho bạn.';
+  let ov = document.getElementById('upgOv');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'upgOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(10,16,28,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = '<div style="max-width:400px;width:100%;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:26px 22px;text-align:center;box-shadow:0 30px 70px -30px rgba(0,0,0,.6);">' +
+    '<div style="font-size:38px;">👑</div>' +
+    '<h3 style="margin:8px 0 6px;font-size:19px;">Nội dung Premium</h3>' +
+    '<p style="color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 16px;">' + reason + '</p>' +
+    '<a href="https://zalo.me/0961923983" target="_blank" rel="noopener" style="display:inline-block;background:linear-gradient(135deg,#f4d68a,#d9a53c);color:#132743;font-weight:800;padding:10px 20px;border-radius:12px;text-decoration:none;">💬 Liên hệ nâng cấp Premium</a>' +
+    '<div style="margin-top:12px;"><button id="upgX" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">Đóng</button></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#upgX').addEventListener('click', () => ov.remove());
+}
+
+/* ================= cloud: per-video progress (bookmarks, notes, done) ================= */
+let PROG = null;          // progress row of the video being practiced
+function blankProg(videoId) {
+  return { user_id: uid, video_id: videoId, last_pos: 0, done: false, sentences: 0,
+           bookmarks: [], notes: {}, updated_at: new Date().toISOString() };
+}
+let progTimer = null;
+function scheduleProgPush() {
+  clearTimeout(progTimer); progTimer = setTimeout(pushProg, 4000);
+  if (PROG) store('prog-' + PROG.video_id, PROG);
+}
+async function pushProg() {
+  if (!uid || !PROG) return;
+  try {
+    PROG.updated_at = new Date().toISOString();
+    await sb.from('shadow_progress').upsert(PROG);
+  } catch (e) {}
+}
+async function pullProg(videoId) {
+  let p = read('prog-' + videoId, null);
+  try {
+    const { data, error } = await sb.from('shadow_progress').select('*')
+      .eq('user_id', uid).eq('video_id', videoId).maybeSingle();
+    if (error) throw error;
+    if (data && (!p || new Date(data.updated_at) >= new Date(p.updated_at || 0))) p = data;
+  } catch (e) {}
+  PROG = p || blankProg(videoId);
+  PROG.bookmarks = PROG.bookmarks || []; PROG.notes = PROG.notes || {};
+  store('prog-' + videoId, PROG);
+}
+
+/* ================= cloud: daily stats ================= */
+const stats = () => read('stats', { days: {} });
+function bumpStat(kind, n) {
+  const s = stats(); const k = todayKey();
+  const d = s.days[k] || (s.days[k] = {});
+  d[kind] = (d[kind] || 0) + n;
+  store('stats', s);
+  scheduleDayPush();
+}
+let dayTimer = null;
+function scheduleDayPush() { clearTimeout(dayTimer); dayTimer = setTimeout(pushDay, 6000); }
+async function pushDay() {
+  if (!uid) return;
+  const k = todayKey(); const d = stats().days[k] || {};
+  try {
+    await sb.from('shadow_days').upsert({ user_id: uid, day: k, listen_sec: d.listen || 0,
+      shadow_sec: d.shadow || 0, sentences: d.sent || 0, done: d.done || 0, saved: d.saved || 0 });
+  } catch (e) {}
+}
+async function pullDays() {
+  try {
+    const { data, error } = await sb.from('shadow_days').select('*');
+    if (error) throw error;
+    const s = stats(); const tk = todayKey();
+    for (const r of data) {
+      const loc = s.days[r.day] || {};
+      s.days[r.day] = r.day === tk
+        ? { listen: Math.max(loc.listen||0, r.listen_sec), shadow: Math.max(loc.shadow||0, r.shadow_sec),
+            sent: Math.max(loc.sent||0, r.sentences), done: Math.max(loc.done||0, r.done), saved: Math.max(loc.saved||0, r.saved) }
+        : { listen: r.listen_sec, shadow: r.shadow_sec, sent: r.sentences, done: r.done, saved: r.saved };
+    }
+    store('stats', s);
+  } catch (e) {}
+}
+
+/* ================= cloud: goals ================= */
+let GOALS = { min: 15, words: 5 };
+async function pullGoals() {
+  GOALS = read('goals', GOALS);
+  try {
+    const { data } = await sb.from('shadow_profile').select('goals').eq('user_id', uid).maybeSingle();
+    if (data && data.goals && data.goals.min !== undefined) { GOALS = data.goals; store('goals', GOALS); }
+  } catch (e) {}
+}
+async function pushGoals() {
+  store('goals', GOALS);
+  try { await sb.from('shadow_profile').upsert({ user_id: uid, goals: GOALS, updated_at: new Date().toISOString() }); } catch (e) {}
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { pushDay(); pushProg(); }
+});
+
+/* ================= vocabulary — SAME store + table as reading.html ================= */
+function localToRow(w, v) {
+  return { user_id: uid, word: w, pinyin: v.p || '', meaning: v.m || '', level: v.lvl || 0,
+    example: v.ex || '', note: v.note || '', status: v.status || 'new',
+    added_at: new Date(v.added || Date.now()).toISOString(),
+    ef: v.srs.ef, ivl_ms: Math.round(v.srs.ivl || 0), due: new Date(v.srs.due || Date.now()).toISOString(),
+    reps: v.srs.reps, lapses: v.srs.lapses, ok: v.srs.ok, total: v.srs.total,
+    up_ms: v.up || Date.now() };
+}
+function rowToLocal(r) {
+  return { p: r.pinyin, m: r.meaning, lvl: r.level, ex: r.example, note: r.note, status: r.status,
+    added: new Date(r.added_at).getTime(), up: Number(r.up_ms) || 0, pushed: true,
+    srs: { ef: r.ef, ivl: Number(r.ivl_ms), due: new Date(r.due).getTime(),
+           reps: r.reps, lapses: r.lapses, ok: r.ok, total: r.total } };
+}
+const pending = () => read('crh-pending', { up: [], del: [] });
+async function pushVocab(w) {
+  if (!uid) return;
+  const vocab = read('crh-vocab', {});
+  const v = vocab[w]; if (!v) return;
+  try {
+    const { error } = await sb.from('reading_vocab').upsert(localToRow(w, v));
+    if (error) throw error;
+    v.pushed = true; store('crh-vocab', vocab);
+  } catch (e) {
+    const p = pending(); if (!p.up.includes(w)) p.up.push(w); store('crh-pending', p);
+  }
+}
+async function pushVocabDelete(w) {
+  if (!uid) return;
+  try {
+    const { error } = await sb.from('reading_vocab').delete().eq('user_id', uid).eq('word', w);
+    if (error) throw error;
+  } catch (e) {
+    const p = pending(); if (!p.del.includes(w)) p.del.push(w); store('crh-pending', p);
+  }
+}
+async function pullVocab() {
+  try {
+    const { data, error } = await sb.from('reading_vocab').select('*');
+    if (error) throw error;
+    const local = read('crh-vocab', {});
+    const server = {};
+    for (const r of data) server[r.word] = rowToLocal(r);
+    const p = pending();
+    const merged = {}, pushUp = [];
+    for (const w of new Set([...Object.keys(local), ...Object.keys(server)])) {
+      if (p.del.includes(w)) continue;
+      const l = local[w], s = server[w];
+      if (l && s) { if ((l.up || 0) > (s.up || 0)) { merged[w] = l; pushUp.push(w); } else merged[w] = s; }
+      else if (l && !s) { if (!l.pushed) { merged[w] = l; pushUp.push(w); } }
+      else merged[w] = s;
+    }
+    store('crh-vocab', merged);
+    for (const w of p.del.splice(0)) { try { await sb.from('reading_vocab').delete().eq('user_id', uid).eq('word', w); } catch (e) {} }
+    const toPush = [...new Set([...p.up.splice(0), ...pushUp])];
+    store('crh-pending', p);
+    for (const w of toPush) await pushVocab(w);
+  } catch (e) { /* offline — local mirror keeps working */ }
+}
+function saveWord(w, p, m, lvl, ex, note, status) {
+  const vocab = read('crh-vocab', {});
+  const isNew = !vocab[w];
+  const cur = vocab[w] || { added: Date.now(), status: 'new',
+    srs: { ef: 2.5, ivl: 0, due: Date.now(), reps: 0, lapses: 0, ok: 0, total: 0 } };
+  vocab[w] = { ...cur, p, m: m || cur.m || '', lvl, ex: ex || cur.ex || '',
+    note: note !== undefined ? note : cur.note || '', status: status || cur.status,
+    up: Date.now(), pushed: false };
+  store('crh-vocab', vocab);
+  if (isNew) { bumpStat('saved', 1); toast('💾 Đã lưu "' + w + '" — ôn trong 📒 Từ vựng'); }
+  else toast('✓ Đã cập nhật "' + w + '"');
+  pushVocab(w);
+}
+
+/* ================= tone utilities (same pipeline as reading.html / pinyin-tool) ================= */
+const MARK_MAP = (() => {
+  const rows = { a:'āáǎà', e:'ēéěè', i:'īíǐì', o:'ōóǒò', u:'ūúǔù', 'ü':'ǖǘǚǜ' };
+  const map = {};
+  for (const plain in rows) [...rows[plain]].forEach((ch, i) => { map[ch] = [plain, i + 1]; });
+  return map;
+})();
+const TONE_CHARS = { a:'āáǎà', e:'ēéěè', i:'īíǐì', o:'ōóǒò', u:'ūúǔù', 'ü':'ǖǘǚǜ' };
+function stripTone(syl) { let out = ''; for (const ch of String(syl).normalize('NFC')) out += MARK_MAP[ch] ? MARK_MAP[ch][0] : ch; return out; }
+function applyTone(plain, tone) {
+  if (!tone || tone < 1 || tone > 4) return plain;
+  const lower = plain.toLowerCase(); let idx = -1;
+  if (lower.includes('a')) idx = lower.indexOf('a');
+  else if (lower.includes('e')) idx = lower.indexOf('e');
+  else if (lower.includes('ou')) idx = lower.indexOf('o');
+  else for (let i = lower.length - 1; i >= 0; i--) if ('aeiouü'.includes(lower[i])) { idx = i; break; }
+  if (idx === -1) return plain;
+  const ch = plain[idx];
+  return plain.slice(0, idx) + (TONE_CHARS[ch] ? TONE_CHARS[ch][tone - 1] : ch) + plain.slice(idx + 1);
+}
+const CJK = /[〇一-鿿㐀-䶿豈-﫿]/;
+/* char-level pinyin with tone-sandhi (一/不 + 3-3) */
+function charAnalyse(line) {
+  if (!window.pinyinPro) return null;
+  const py = window.pinyinPro.pinyin;
+  const base = py(line, { type: 'all', toneSandhi: false });
+  let yibu = null;
+  const s = py(line, { type: 'all', toneSandhi: true });
+  if (s.length === base.length) yibu = s;
+  const items = base.map((b, i) => {
+    const isZh = (typeof b.isZh === 'boolean') ? b.isZh : CJK.test(b.origin);
+    let tone = b.num || 0;
+    if (yibu && isZh) { const t2 = yibu[i].num || 0; if (t2 !== tone) tone = t2; }
+    return { origin: b.origin, plain: isZh ? stripTone(b.pinyin) : '', tone, isZh };
+  });
+  for (let i = 1; i < items.length - 1; i++) {
+    if (items[i].origin === '不' && items[i-1].isZh && items[i+1].isZh &&
+        items[i-1].origin === items[i+1].origin && items[i].tone !== 0) items[i].tone = 0;
+  }
+  let start = -1;
+  const flush = end => { if (start !== -1 && end - start >= 2) for (let i = start; i < end - 1; i++) items[i].tone = 2; start = -1; };
+  items.forEach((it, i) => { if (it.isZh && it.tone === 3) { if (start === -1) start = i; } else flush(i); });
+  flush(items.length);
+  return items.map(it => ({ ...it, mark: it.isZh ? applyTone(it.plain, it.tone) : it.origin }));
+}
+/* pinyin for one word/sentence as a display string */
+function pyOf(text) {
+  const items = charAnalyse(text);
+  return items ? items.filter(x => x.isZh).map(x => x.mark).join(' ') : '';
+}
+
+/* ================= HSK dictionary (same cache as reading.html) ================= */
+const DICT_URL = i => 'https://cdn.jsdelivr.net/gh/clem109/hsk-vocabulary@master/hsk-vocab-json/hsk-level-' + i + '.json';
+let DICT = {}, DICT_CUSTOM = [], MAXW = 1;
+function rebuildDictIndex() {
+  for (const e of DICT_CUSTOM) DICT[e.word] = [e.pinyin, e.meaning, +e.level, e.example || ''];
+  MAXW = 1;
+  for (const w in DICT) if (w.length > MAXW) MAXW = w.length;
+}
+async function loadCloudDict() {
+  try {
+    const { data, error } = await sb.from('reading_dict').select('*').order('word');
+    if (error) throw error;
+    DICT_CUSTOM = data;
+    store('cdict-cache', DICT_CUSTOM);
+  } catch (e) { DICT_CUSTOM = read('cdict-cache', []); }
+}
+async function loadDict() {
+  const cached = read('crh-dict-v1', null);
+  if (cached && cached.words) { DICT = cached.words; rebuildDictIndex(); return true; }
+  try {
+    const all = await Promise.all([1,2,3,4,5,6].map(i => fetch(DICT_URL(i)).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })));
+    DICT = {};
+    all.forEach((list, idx) => {
+      for (const e of list) {
+        if (!DICT[e.hanzi]) DICT[e.hanzi] = [String(e.pinyin || '').trim(), (e.translations || []).slice(0, 3).join('; '), idx + 1];
+      }
+    });
+    store('crh-dict-v1', { v: 1, words: DICT });
+    rebuildDictIndex();
+    return true;
+  } catch (e) { rebuildDictIndex(); return false; }
+}
+function lookup(w) { return DICT[w] || null; }
+/* greedy longest-match segmentation over the HSK dictionary */
+function segment(line) {
+  const toks = [];
+  let i = 0;
+  while (i < line.length) {
+    const ch = line[i];
+    if (!CJK.test(ch)) { toks.push({ w: ch, lvl: -1, zh: false }); i++; continue; }
+    let hit = null;
+    for (let len = Math.min(MAXW, line.length - i); len >= 2; len--) {
+      const cand = line.substr(i, len);
+      if (DICT[cand]) { hit = cand; break; }
+    }
+    if (!hit) hit = ch;
+    const d = lookup(hit);
+    toks.push({ w: hit, lvl: d ? d[2] : 0, zh: true });
+    i += hit.length;
+  }
+  return toks;
+}
+
+/* ================= speech engine (Azure shared key + device voices) ================= */
+const escXml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+let netOk = true;
+const netCache = new Map();
+let AZ_SHARED = { key: '', region: 'southeastasia' };
+async function loadSettings() {
+  try {
+    const { data } = await sb.from('reading_settings').select('*').eq('id', 1).maybeSingle();
+    if (data && data.az_key) AZ_SHARED = { key: data.az_key, region: data.az_region || 'southeastasia' };
+  } catch (e) {}
+}
+async function azureSynth(text, ratePct) {
+  const res = await fetch('https://' + AZ_SHARED.region + '.tts.speech.microsoft.com/cognitiveservices/v1', {
+    method: 'POST',
+    headers: { 'Ocp-Apim-Subscription-Key': AZ_SHARED.key, 'Content-Type': 'application/ssml+xml',
+      'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3' },
+    body: '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">' +
+      '<voice name="zh-CN-XiaoxiaoNeural"><prosody rate="' + (ratePct >= 0 ? '+' : '') + Math.round(ratePct) + '%">' +
+      escXml(text) + '</prosody></voice></speak>'
+  });
+  if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
+  return new Blob([await res.arrayBuffer()], { type: 'audio/mpeg' });
+}
+function mandarinVoices() {
+  if (!('speechSynthesis' in window)) return [];
+  return speechSynthesis.getVoices()
+    .filter(v => /^zh[-_](cn|tw)/i.test(v.lang) || /^zh$/i.test(v.lang))
+    .filter(v => !/hk|cantonese/i.test(v.lang + ' ' + v.name) && !/^yue/i.test(v.lang));
+}
+let speakToken = 0, currentAudio = null;
+function stopSpeak() {
+  speakToken++;
+  if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+  try { speechSynthesis.cancel(); } catch (e) {}
+}
+async function speak(text, ratePct) {
+  stopSpeak();
+  const my = speakToken;
+  ratePct = ratePct || 0;
+  if (AZ_SHARED.key && netOk && navigator.onLine !== false) {
+    try {
+      const k = ratePct + '|' + text;
+      if (!netCache.has(k)) {
+        if (netCache.size > 60) netCache.delete(netCache.keys().next().value);
+        netCache.set(k, azureSynth(text, ratePct));
+        netCache.get(k).catch(() => netCache.delete(k));
+      }
+      const blob = await netCache.get(k);
+      if (speakToken !== my) return;
+      await new Promise(res => {
+        const a = new Audio(URL.createObjectURL(blob));
+        currentAudio = a; a.onended = res; a.onerror = res;
+        a.play().catch(res);
+      });
+      return;
+    } catch (e) { netOk = false; }
+  }
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  const v = mandarinVoices()[0]; if (v) u.voice = v;
+  u.rate = 1 + ratePct / 100;
+  if (speakToken !== my) return;
+  speechSynthesis.speak(u);
+}
+/* ================= preferences ================= */
+let prefs = { py:'all', tr:true, mode:'normal', reps:2, gap:1.5, rate:1, fontHz:24,
+              chal:false, scroll:true, preset:'beginner', lastvid:'' };
+function loadPrefs() { prefs = { ...prefs, ...read('prefs', {}) }; }
+function savePrefs() { store('prefs', prefs); }
+
+/* ================= YouTube URL / metadata / subtitles import ================= */
+function extractYtId(url) {
+  url = String(url || '').trim();
+  if (/^[\w-]{11}$/.test(url)) return url;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+const PROXIES = [
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+];
+async function proxied(url) {
+  let lastErr = null;
+  for (const p of PROXIES) {
+    try {
+      const ctl = new AbortController();
+      const kill = setTimeout(() => ctl.abort(), 14000);
+      const r = await fetch(p(url), { signal: ctl.signal });
+      clearTimeout(kill);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const txt = await r.text();
+      if (txt) return txt;
+      throw new Error('empty');
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('proxy');
+}
+async function fetchTitle(ytid) {
+  try {
+    const r = await fetch('https://noembed.com/embed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + ytid));
+    const j = await r.json();
+    if (j && j.title) return j.title;
+  } catch (e) {}
+  try {
+    const t = await proxied('https://www.youtube.com/oembed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + ytid) + '&format=json');
+    const j = JSON.parse(t);
+    if (j && j.title) return j.title;
+  } catch (e) {}
+  return '';
+}
+/* find the captionTracks JSON array inside the watch-page HTML (balanced-bracket scan) */
+function extractTracks(html) {
+  const key = '"captionTracks":';
+  const at = html.indexOf(key);
+  if (at === -1) return [];
+  let i = html.indexOf('[', at + key.length);
+  if (i === -1) return [];
+  let depth = 0, inStr = false, esc = false;
+  for (let j = i; j < html.length; j++) {
+    const c = html[j];
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === '[') depth++;
+    else if (c === ']') { depth--; if (depth === 0) { try { return JSON.parse(html.slice(i, j + 1)); } catch (e) { return []; } } }
+  }
+  return [];
+}
+function json3ToCues(j) {
+  const out = [];
+  for (const e of (j.events || [])) {
+    if (!e.segs) continue;
+    const text = e.segs.map(s => s.utf8 || '').join('').replace(/\s*\n\s*/g, ' ').trim();
+    if (!text) continue;
+    out.push({ a: e.tStartMs / 1000, b: (e.tStartMs + (e.dDurMs || 3000)) / 1000, zh: text });
+  }
+  return out;
+}
+function fetchT(url, ms, opts) {
+  const ctl = new AbortController();
+  const kill = setTimeout(() => ctl.abort(), ms || 10000);
+  return fetch(url, { ...(opts || {}), signal: ctl.signal }).finally(() => clearTimeout(kill));
+}
+/* 1st choice: our own Supabase Edge Function (deploy yt-captions.ts once — reliable) */
+async function edgeFetch(ytid, tlang) {
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetchT(SUPABASE_URL + '/functions/v1/yt-captions', 20000, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY),
+      'apikey': SUPABASE_ANON_KEY },
+    body: JSON.stringify({ ytid: ytid, tlang: tlang || '' })
+  });
+  if (!res.ok) throw new Error('edge ' + res.status);
+  return res.json();
+}
+/* 3rd choice: public Invidious mirrors (CORS-friendly caption API) */
+const INV_HOSTS = ['inv.nadeko.net', 'iv.melmac.space', 'yewtu.be', 'invidious.f5.si'];
+async function invidiousSubs(ytid) {
+  for (const h of INV_HOSTS) {
+    try {
+      const list = await (await fetchT('https://' + h + '/api/v1/captions/' + ytid, 8000)).json();
+      const caps = list.captions || [];
+      const zh = caps.find(c => /^zh/i.test(c.languageCode || ''));
+      if (!zh) continue;
+      const vtt = await (await fetchT('https://' + h + zh.url, 8000)).text();
+      const cues = parseSrt(vtt);
+      if (cues.length) return { source: 'inv', host: h, caps, cues, label: zh.label || 'tiếng Trung', ytid };
+    } catch (e) {}
+  }
+  throw new Error('inv');
+}
+async function fetchAutoSubs(ytid) {
+  try {
+    const j = await edgeFetch(ytid, '');
+    if (j && j.zh) {
+      const cues = json3ToCues(j.zh);
+      if (cues.length) return { source: 'edge', cues, label: j.label || 'tiếng Trung', ytid };
+    }
+  } catch (e) {}
+  try {
+    const html = await proxied('https://www.youtube.com/watch?v=' + ytid + '&hl=zh-CN&has_verified=1');
+    const tracks = extractTracks(html);
+    const zh = tracks.filter(t => /^zh/i.test(t.languageCode || ''));
+    const track = zh.find(t => t.kind !== 'asr') || zh[0];
+    if (track) {
+      const cues = json3ToCues(JSON.parse(await proxied(track.baseUrl + '&fmt=json3')));
+      if (cues.length) {
+        const label = (track.name && (track.name.simpleText || (track.name.runs || []).map(r => r.text).join(''))) || track.languageCode;
+        return { source: 'scrape', cues, track, ytid, label: label + (track.kind === 'asr' ? ' (tự động)' : '') };
+      }
+    }
+  } catch (e) {}
+  return invidiousSubs(ytid);
+}
+async function fetchTranslationFor(auto, lang) {
+  if (auto.source === 'edge') {
+    const j = await edgeFetch(auto.ytid, lang);
+    if (j && j.tr) { const cues = json3ToCues(j.tr); if (cues.length) return cues; }
+    throw new Error('notr');
+  }
+  if (auto.source === 'scrape')
+    return json3ToCues(JSON.parse(await proxied(auto.track.baseUrl + '&fmt=json3&tlang=' + lang)));
+  if (auto.source === 'inv') {
+    const c = (auto.caps || []).find(x => (x.languageCode || '') === lang);
+    if (c) { const cues = parseSrt(await (await fetchT('https://' + auto.host + c.url, 8000)).text()); if (cues.length) return cues; }
+    throw new Error('notr');
+  }
+  throw new Error('notr');
+}
+/* SRT / VTT → cues. Bilingual blocks (a CJK line + a latin line) are split into zh + tr. */
+function parseSrt(text) {
+  text = String(text || '').replace(/^﻿/, '').replace(/\r/g, '');
+  const cues = [];
+  const toSec = ts => {
+    const m = ts.match(/(?:(\d+):)?(\d+):(\d+)[.,](\d+)/);
+    if (!m) return null;
+    return (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4].padEnd(3, '0').slice(0, 3)) / 1000;
+  };
+  for (const block of text.split(/\n\s*\n/)) {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    const ti = lines.findIndex(l => l.includes('-->'));
+    if (ti === -1) continue;
+    const [t0, t1] = lines[ti].split('-->').map(s => toSec(s));
+    if (t0 === null || t1 === null) continue;
+    const body = lines.slice(ti + 1).map(l => l.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+    if (!body.length) continue;
+    const zhLines = body.filter(l => CJK.test(l));
+    const trLines = body.filter(l => !CJK.test(l));
+    const cue = { a: t0, b: t1, zh: (zhLines.length ? zhLines : body).join(' ') };
+    if (zhLines.length && trLines.length) cue.tr = trLines.join(' ');
+    cues.push(cue);
+  }
+  return cues.sort((x, y) => x.a - y.a);
+}
+/* YouTube transcript-panel paste: "0:07" on its own line (or "0:07 大家好"),
+   text on the following line(s); no end times — each cue ends where the next starts */
+function parseTranscript(text) {
+  const TS = /^(?:(\d{1,2}):)?(\d{1,3}):(\d{2})(?:\s+(.*))?$/;
+  const cues = [];
+  let cur = null;
+  for (let line of String(text || '').replace(/\r/g, '').split('\n')) {
+    line = line.trim();
+    if (!line) continue;
+    const m = line.match(TS);
+    if (m && !/-->/.test(line)) {
+      if (cur && cur.zh.length) cues.push(cur);
+      const sec = (+(m[1] || 0)) * 3600 + (+m[2]) * 60 + (+m[3]);
+      cur = { a: sec, zh: [] };
+      if (m[4]) cur.zh.push(m[4].trim());
+    } else if (cur) {
+      cur.zh.push(line);
+    }
+  }
+  if (cur && cur.zh.length) cues.push(cur);
+  return cues.map((c, i) => {
+    const body = c.zh;
+    const zhLines = body.filter(l => CJK.test(l));
+    const trLines = body.filter(l => !CJK.test(l));
+    const out = { a: c.a, b: i + 1 < cues.length ? cues[i + 1].a : c.a + 4,
+                  zh: (zhLines.length ? zhLines : body).join(' ') };
+    if (zhLines.length && trLines.length) out.tr = trLines.join(' ');
+    return out;
+  }).filter(c => c.zh);
+}
+/* accept SRT/VTT first, then the transcript-panel format */
+function parseSubs(text) {
+  const srt = parseSrt(text);
+  return srt.length ? srt : parseTranscript(text);
+}
+/* attach a translation cue list to the Chinese cues by max time-overlap */
+function mergeTr(cues, trCues) {
+  if (!trCues || !trCues.length) return;
+  for (const c of cues) {
+    let best = null, bestOv = 0;
+    for (const t of trCues) {
+      const ov = Math.min(c.b, t.b) - Math.max(c.a, t.a);
+      if (ov > bestOv) { bestOv = ov; best = t; }
+      if (t.a > c.b) break;
+    }
+    if (best && !c.tr) c.tr = best.zh;
+  }
+}
+function normalizeCues(cues) {
+  cues.sort((x, y) => x.a - y.a);
+  for (let i = 0; i < cues.length; i++) {
+    const c = cues[i];
+    c.a = Math.max(0, +c.a || 0);
+    c.b = Math.max(c.a + 0.4, +c.b || c.a + 3);
+    if (i + 1 < cues.length && c.b > cues[i + 1].a) c.b = Math.max(c.a + 0.4, cues[i + 1].a);
+    c.zh = String(c.zh || '').trim();
+    if (c.tr) c.tr = String(c.tr).trim();
+  }
+  return cues.filter(c => c.zh);
+}
+
+/* ================= import flow ================= */
+let IMP = null;   // { yt, title, auto: {cues,track,label}, cues: final }
+$('btnLoadUrl').addEventListener('click', startImport);
+$('impUrl').addEventListener('keydown', e => { if (e.key === 'Enter') startImport(); });
+async function startImport() {
+  const ytid = extractYtId($('impUrl').value);
+  if (!ytid) { $('impStatus').textContent = '✗ Link chưa đúng — hãy dán link video YouTube (youtube.com/watch?v=… hoặc youtu.be/…).'; return; }
+  const existing = VIDS.find(v => v.yt === ytid && (v.published || v.created_by === uid || isStaff));
+  if (existing) { toast('Video này đã có trong thư viện — mở luôn.'); openVideo(existing); return; }
+  IMP = { yt: ytid, title: '', auto: null, cues: null };
+  $('impStatus').textContent = '';
+  $('impPanel').hidden = false;
+  $('impThumb').src = 'https://img.youtube.com/vi/' + ytid + '/mqdefault.jpg';
+  $('impTitle').value = '';
+  $('autoResult').hidden = true;
+  $('manualBox').open = false;
+  $('manualInfo').textContent = '';
+  $('btnSaveVideo').disabled = true;
+  $('impSaveInfo').textContent = '';
+  $('subFetchStatus').textContent = '⏳ Đang lấy tên video và tìm phụ đề tiếng Trung…';
+  fetchTitle(ytid).then(t => { if (IMP && IMP.yt === ytid && t && !$('impTitle').value) { IMP.title = t; $('impTitle').value = t; } });
+  try {
+    const auto = await fetchAutoSubs(ytid);
+    if (!IMP || IMP.yt !== ytid) return;
+    IMP.auto = auto;
+    $('subFetchStatus').textContent = '';
+    $('autoInfo').innerHTML = '✓ Tìm thấy phụ đề <b>' + escH(auto.label) + '</b> — ' + auto.cues.length + ' câu.';
+    $('autoResult').hidden = false;
+  } catch (e) {
+    if (!IMP || IMP.yt !== ytid) return;
+    $('subFetchStatus').innerHTML = '<span class="offline">Không tự lấy được phụ đề của video này (video không có phụ đề tiếng Trung, hoặc YouTube chặn). Bạn có thể dán phụ đề thủ công bên dưới 👇</span>';
+    $('manualBox').open = true;
+  }
+}
+$('btnUseAuto').addEventListener('click', async () => {
+  if (!IMP || !IMP.auto) return;
+  const lang = $('autoTrLang').value;
+  $('autoInfo').textContent = '⏳ Đang chuẩn bị phụ đề' + (lang ? ' + bản dịch…' : '…');
+  const cues = IMP.auto.cues.map(c => ({ ...c }));
+  if (lang) {
+    try { mergeTr(cues, await fetchTranslationFor(IMP.auto, lang)); }
+    catch (e) { toast('Không lấy được bản dịch — vẫn dùng được phụ đề tiếng Trung.'); }
+  }
+  IMP.cues = normalizeCues(cues);
+  $('autoInfo').innerHTML = '✓ Sẵn sàng: <b>' + IMP.cues.length + ' câu</b>' + (IMP.cues.some(c => c.tr) ? ' (có bản dịch)' : '') + '.';
+  $('btnSaveVideo').disabled = false;
+});
+function readFileInto(fileInput, ta) {
+  const f = fileInput.files && fileInput.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { ta.value = r.result; };
+  r.readAsText(f);
+}
+$('subFileZh').addEventListener('change', () => readFileInto($('subFileZh'), $('subPasteZh')));
+$('subFileTr').addEventListener('change', () => readFileInto($('subFileTr'), $('subPasteTr')));
+$('btnUseManual').addEventListener('click', () => {
+  if (!IMP) return;
+  const cues = parseSubs($('subPasteZh').value);
+  if (!cues.length) { $('manualInfo').textContent = '✗ Chưa đọc được phụ đề — dán tệp SRT/VTT hoặc bản chép lời của YouTube (dòng "0:07" rồi dòng chữ).'; return; }
+  mergeTr(cues, parseSubs($('subPasteTr').value));
+  IMP.cues = normalizeCues(cues);
+  $('manualInfo').textContent = '✓ Đã đọc ' + IMP.cues.length + ' câu' + (IMP.cues.some(c => c.tr) ? ' (có bản dịch)' : '') + '.';
+  $('btnSaveVideo').disabled = false;
+});
+$('btnCancelImport').addEventListener('click', () => { IMP = null; $('impPanel').hidden = true; });
+$('btnSaveVideo').addEventListener('click', async () => {
+  if (!IMP || !IMP.cues || !IMP.cues.length) return;
+  $('btnSaveVideo').disabled = true;
+  $('impSaveInfo').textContent = '⏳ Đang lưu…';
+  const row = { yt: IMP.yt, title: ($('impTitle').value || IMP.title || 'Video ' + IMP.yt).trim(),
+    level: +$('impLevel').value, subs: IMP.cues, published: isStaff ? $('impPub').checked : false, created_by: uid };
+  if (ACCESS_READY) {
+    row.tier = isStaff ? $('impTier').value : 'free';
+    row.sort_order = VIDS.reduce((m, v) => Math.max(m, v.sort_order || 0), 0) + 1;
+  }
+  try {
+    const { data, error } = await sb.from('shadow_videos').insert(row).select().single();
+    if (error) throw error;
+    VIDS.unshift(data);
+    store('vids-cache', VIDS);
+    IMP = null; $('impPanel').hidden = true; $('impUrl').value = '';
+    renderLibrary();
+    toast('💾 Đã lưu video vào thư viện');
+    openVideo(data);
+  } catch (e) {
+    $('impSaveInfo').textContent = '✗ Không lưu được (' + (e.message || 'mất mạng') + ') — video vẫn mở để luyện, nhưng sẽ không được ghi nhớ.';
+    $('btnSaveVideo').disabled = false;
+    openVideo({ id: null, ...row });
+  }
+});
+
+/* ================= player + practice state ================= */
+let CUR = null, cues = [], activeIdx = -1, LOOP = -1;
+let yt = null, ytReadyq = null;
+function loadYtApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  if (ytReadyq) return ytReadyq;
+  ytReadyq = new Promise(res => {
+    window.onYouTubeIframeAPIReady = () => res();
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  });
+  return ytReadyq;
+}
+async function openVideo(v) {
+  if (isLocked(v)) { showUpgrade(v); return; }
+  CUR = v;
+  cues = normalizeCues((v.subs || []).map(c => ({ ...c })));
+  activeIdx = -1; LOOP = -1;
+  clearShadow();
+  showView('practice');
+  $('noVideo').hidden = true;
+  $('practiceWrap').hidden = false;
+  $('prTitle').textContent = v.title;
+  $('prLv').className = 'lv lv' + (v.level || 0);
+  $('prLv').textContent = v.level ? 'HSK ' + v.level : 'chưa xếp cấp';
+  prefs.lastvid = v.id || ''; savePrefs();
+  PROG = blankProg(v.id);
+  renderSubs();
+  if (v.id) { await pullProg(v.id); renderBmk(); renderNotes(); updateDoneBtn(); }
+  await loadYtApi();
+  if (yt && yt.loadVideoById) {
+    yt.loadVideoById(v.yt);
+  } else {
+    yt = new YT.Player('ytMount', {
+      videoId: v.yt,
+      playerVars: { rel: 0, playsinline: 1, controls: 1 },
+      events: { onReady: () => { try { yt.setPlaybackRate(prefs.rate); } catch (e) {} } }
+    });
+  }
+  if (SH.on) { SH.on = false; $('pMode').value = 'normal'; }
+}
+function playerTime() { try { return yt && yt.getCurrentTime ? yt.getCurrentTime() : 0; } catch (e) { return 0; } }
+function playerState() { try { return yt && yt.getPlayerState ? yt.getPlayerState() : -1; } catch (e) { return -1; } }
+function seekPlay(t) { try { yt.seekTo(t, true); yt.playVideo(); } catch (e) {} }
+
+/* ================= shadowing engine ================= */
+const SH = { on: false, idx: -1, rep: 0, phase: 'idle', wt: 0, timer: null, counted: {} };
+function clearShadow() {
+  SH.wt++; clearInterval(SH.timer); SH.phase = 'idle'; SH.rep = 0; SH.counted = {};
+  $('waitBox').hidden = true;
+}
+function playCue(i, resetRep) {
+  if (i < 0 || i >= cues.length) return;
+  SH.wt++; clearInterval(SH.timer);
+  $('waitBox').hidden = true;
+  SH.idx = i;
+  if (resetRep) SH.rep = 0;
+  SH.phase = 'play';
+  seekPlay(cues[i].a);
+  setActive(i, true);
+}
+function enterWait() {
+  const c = cues[SH.idx];
+  try { yt.pauseVideo(); } catch (e) {}
+  SH.phase = 'wait';
+  SH.rep++;
+  if (!SH.counted[SH.idx]) { SH.counted[SH.idx] = 1; bumpStat('sent', 1); if (PROG) { PROG.sentences = (PROG.sentences || 0) + 1; scheduleProgPush(); } }
+  const reps = +prefs.reps;
+  $('waitRepInfo').textContent = reps >= 99 ? '(lặp ∞ — lần ' + SH.rep + ')' : '(lần ' + SH.rep + '/' + reps + ')';
+  $('waitCue').textContent = c.zh;
+  $('waitBox').hidden = false;
+  const my = ++SH.wt;
+  const gap = +prefs.gap;
+  const fill = $('waitBarFill');
+  if (!gap) { fill.style.width = '100%'; return; }     // chờ tôi bấm
+  const dur = Math.max(1200, (c.b - c.a) / prefs.rate * gap * 1000);
+  const t0 = Date.now();
+  fill.style.width = '0%';
+  clearInterval(SH.timer);
+  SH.timer = setInterval(() => {
+    if (SH.wt !== my) { clearInterval(SH.timer); return; }
+    const k = Math.min(1, (Date.now() - t0) / dur);
+    fill.style.width = (k * 100) + '%';
+    if (k >= 1) { clearInterval(SH.timer); shadowAdvance(); }
+  }, 100);
+}
+function shadowAdvance() {
+  const reps = +prefs.reps;
+  if (SH.rep < reps) { playCue(SH.idx, false); return; }
+  SH.rep = 0;
+  if (SH.idx + 1 < cues.length) playCue(SH.idx + 1, true);
+  else { $('waitBox').hidden = true; SH.phase = 'idle'; finishVideo(); }
+}
+$('btnWaitReplay').addEventListener('click', () => { SH.rep = Math.max(0, SH.rep - 1); playCue(SH.idx, false); });
+$('btnWaitNext').addEventListener('click', () => { SH.rep = 0; if (SH.idx + 1 < cues.length) playCue(SH.idx + 1, true); else { $('waitBox').hidden = true; finishVideo(); } });
+$('btnWaitSlow').addEventListener('click', () => { const c = cues[SH.idx]; if (c) speak(c.zh, -35); });
+$('btnWaitRec').addEventListener('click', () => openRec(SH.idx));
+$('pMode').addEventListener('change', () => {
+  prefs.mode = $('pMode').value; savePrefs();
+  if (prefs.mode === 'shadow') { SH.on = true; playCue(activeIdx >= 0 ? activeIdx : 0, true); }
+  else { SH.on = false; clearShadow(); }
+});
+$('pReps').addEventListener('change', () => { prefs.reps = +$('pReps').value; savePrefs(); });
+$('pGap').addEventListener('change', () => { prefs.gap = +$('pGap').value; savePrefs(); });
+
+function finishVideo() {
+  if (PROG && !PROG.done) {
+    PROG.done = true; scheduleProgPush(); updateDoneBtn();
+    bumpStat('done', 1);
+    toast('🎉 Hoàn thành video! Xem tiến bộ trong 📊 Thống kê.');
+    renderLibrary();
+  }
+}
+function updateDoneBtn() {
+  $('btnMarkDone').textContent = PROG && PROG.done ? '✓ Đã hoàn thành' : '✓ Đánh dấu đã hoàn thành';
+  $('btnMarkDone').classList.toggle('on', !!(PROG && PROG.done));
+}
+$('btnMarkDone').addEventListener('click', () => {
+  if (!PROG) return;
+  if (PROG.done) { PROG.done = false; scheduleProgPush(); updateDoneBtn(); renderLibrary(); }
+  else finishVideo();
+});
+$('btnBackLib').addEventListener('click', () => showView('lib'));
+
+/* main 200 ms tick: highlight sync, shadow pauses, loop, listening time */
+let listenAcc = 0, shadowAcc = 0;
+setInterval(() => {
+  if (!CUR || currentView !== 'practice') return;
+  const st = playerState();
+  const t = playerTime();
+  if (st === 1) { listenAcc += 0.2; if (listenAcc >= 5) { bumpStat('listen', Math.round(listenAcc)); listenAcc = 0; } }
+  if (SH.on && SH.phase === 'wait') { shadowAcc += 0.2; if (shadowAcc >= 5) { bumpStat('shadow', Math.round(shadowAcc)); shadowAcc = 0; } }
+  if (PROG && t > 0) PROG.last_pos = t;
+  if (SH.on && SH.phase === 'play') {
+    const c = cues[SH.idx];
+    if (c && t >= c.b - 0.08 && st === 1) { enterWait(); return; }
+    if (c && (t < c.a - 2 || t > c.b + 2)) {          // user scrubbed away — adopt new position
+      const i = cueIndexAt(t);
+      if (i >= 0 && i !== SH.idx) { SH.idx = i; SH.rep = 0; setActive(i, true); }
+    }
+    return;
+  }
+  if (SH.on && SH.phase === 'wait') return;           // keep the sentence highlighted while waiting
+  if (LOOP >= 0 && cues[LOOP] && t >= cues[LOOP].b) { seekPlay(cues[LOOP].a); return; }
+  const i = cueIndexAt(t);
+  if (i !== activeIdx) setActive(i, st === 1);
+  if (st === 0 && PROG && !PROG.done && cues.length && t >= cues[cues.length - 1].a) finishVideo();
+}, 200);
+function cueIndexAt(t) {
+  for (let i = 0; i < cues.length; i++) { if (t >= cues[i].a - 0.02 && t < cues[i].b) return i; if (cues[i].a > t) break; }
+  return -1;
+}
+
+/* ================= subtitle rendering ================= */
+function tokHtml(line) {
+  const items = charAnalyse(line) || [];
+  const chars = {};
+  let ci = 0;
+  for (const it of items) { chars[ci] = it; ci += it.origin.length; }
+  const toks = segment(line);
+  const vocab = read('crh-vocab', {});
+  let html = '', pos = 0, plain = '';
+  const flushPlain = () => { if (plain) { html += '<span class="tok o"><span class="py"></span><span class="hz">' + escH(plain) + '</span></span>'; plain = ''; } };
+  for (const tk of toks) {
+    if (!tk.zh) { plain += tk.w; pos += tk.w.length; continue; }
+    flushPlain();
+    let py = '';
+    for (let k = 0; k < tk.w.length; k++) { const it = chars[pos + k]; if (it && it.isZh) py += (py ? ' ' : '') + it.mark; }
+    html += '<span class="tok zh l' + (tk.lvl > 0 ? tk.lvl : 0) + (vocab[tk.w] ? ' saved' : '') + '" data-w="' + escH(tk.w) + '">' +
+      '<span class="py">' + escH(py) + '</span><span class="hz">' + escH(tk.w) + '</span></span>';
+    pos += tk.w.length;
+  }
+  flushPlain();
+  return html;
+}
+function renderSubs() {
+  const el = $('subList');
+  let html = '';
+  for (let i = 0; i < cues.length; i++) {
+    const c = cues[i];
+    html += '<div class="cue" data-i="' + i + '">' +
+      '<div class="time"><span>▶ ' + fmtT(c.a) + '</span><span class="ops">' +
+        '<button data-act="ana" title="Phân tích câu">🔎</button>' +
+        '<button data-act="loop" title="Lặp câu này">🔁</button>' +
+        '<button data-act="bmk" title="Đánh dấu">🔖</button>' +
+        '<button data-act="note" title="Ghi chú">📝</button>' +
+        '<button data-act="rec" title="Ghi âm & chấm điểm">🎙</button>' +
+        '<button data-act="slow" title="Đọc chậm (AI)">🐢</button>' +
+      '</span></div>' +
+      '<div class="zhline">' + tokHtml(c.zh) + '</div>' +
+      (c.tr ? '<div class="trline">' + escH(c.tr) + '</div>' : '') +
+      '</div>';
+  }
+  el.innerHTML = html || '<div class="mutetext" style="padding:14px">Video này chưa có phụ đề.</div>';
+  applyDisplayPrefs();
+  refreshCueMarks();
+}
+function setActive(i, autoscroll) {
+  const el = $('subList');
+  const old = el.querySelector('.cue.active');
+  if (old) old.classList.remove('active');
+  activeIdx = i;
+  if (i < 0) return;
+  const row = el.querySelector('.cue[data-i="' + i + '"]');
+  if (!row) return;
+  row.classList.add('active');
+  if (autoscroll && prefs.scroll && !$('pSearch').value) {
+    const r = row.getBoundingClientRect(), lr = el.getBoundingClientRect();
+    if (r.top < lr.top + 10 || r.bottom > lr.bottom - 10)
+      el.scrollTop += r.top - lr.top - lr.height * 0.35;
+  }
+  showAna(i);
+}
+function refreshCueMarks() {
+  const el = $('subList');
+  el.querySelectorAll('.cue').forEach(row => {
+    const i = +row.dataset.i;
+    const b = row.querySelector('[data-act="bmk"]');
+    if (b) { b.classList.toggle('mark', PROG && PROG.bookmarks.includes(i)); b.textContent = PROG && PROG.bookmarks.includes(i) ? '🔖' : '🔖'; b.style.opacity = PROG && PROG.bookmarks.includes(i) ? 1 : ''; }
+    const n = row.querySelector('[data-act="note"]');
+    if (n) n.classList.toggle('mark', !!(PROG && PROG.notes[i]));
+    const l = row.querySelector('[data-act="loop"]');
+    if (l) l.classList.toggle('mark', LOOP === i);
+  });
+  $('bmkCount').textContent = PROG && PROG.bookmarks.length ? '(' + PROG.bookmarks.length + ')' : '';
+}
+function updateSavedMarks() {
+  const vocab = read('crh-vocab', {});
+  document.querySelectorAll('#subList .tok.zh').forEach(tk => tk.classList.toggle('saved', !!vocab[tk.dataset.w]));
+}
+$('subList').addEventListener('click', e => {
+  const op = e.target.closest('.ops button');
+  const row = e.target.closest('.cue');
+  if (!row) return;
+  const i = +row.dataset.i;
+  if (op) { cueAction(op.dataset.act, i); return; }
+  const tok = e.target.closest('.tok.zh');
+  if (tok) {
+    if (prefs.py === 'click') tok.classList.toggle('pyon');
+    wordClicked(tok.dataset.w, cues[i].zh, tok);
+    return;
+  }
+  if (SH.on) playCue(i, true); else seekPlay(cues[i].a);
+});
+$('subList').addEventListener('dblclick', e => {
+  const row = e.target.closest('.cue');
+  if (row && prefs.chal) row.classList.add('revealed');
+});
+function cueAction(act, i) {
+  const c = cues[i];
+  if (act === 'ana') { showAna(i); showPTab('Ana'); }
+  if (act === 'loop') { LOOP = LOOP === i ? -1 : i; if (LOOP >= 0) { if (SH.on) { $('pMode').value = 'normal'; prefs.mode = 'normal'; SH.on = false; clearShadow(); } seekPlay(c.a); toast('🔁 Đang lặp câu này — bấm 🔁 lần nữa để dừng'); } refreshCueMarks(); }
+  if (act === 'bmk') {
+    if (!PROG) return;
+    const at = PROG.bookmarks.indexOf(i);
+    if (at === -1) { PROG.bookmarks.push(i); PROG.bookmarks.sort((a, b) => a - b); toast('🔖 Đã đánh dấu câu'); }
+    else PROG.bookmarks.splice(at, 1);
+    scheduleProgPush(); refreshCueMarks(); renderBmk();
+  }
+  if (act === 'note') {
+    if (!PROG) return;
+    const cur = PROG.notes[i] || '';
+    const note = prompt('Ghi chú cho câu:\n' + c.zh, cur);
+    if (note === null) return;
+    if (note.trim()) PROG.notes[i] = note.trim(); else delete PROG.notes[i];
+    scheduleProgPush(); refreshCueMarks(); renderNotes();
+  }
+  if (act === 'rec') openRec(i);
+  if (act === 'slow') { try { yt.pauseVideo(); } catch (e2) {} speak(c.zh, -35); }
+}
+
+/* search / filter cues */
+$('pSearch').addEventListener('input', () => {
+  const q = $('pSearch').value.trim().toLowerCase();
+  document.querySelectorAll('#subList .cue').forEach(row => {
+    if (!q) { row.style.display = ''; return; }
+    const c = cues[+row.dataset.i];
+    if (!c._py) c._py = pyOf(c.zh).toLowerCase();
+    const hit = c.zh.toLowerCase().includes(q) || c._py.includes(q) ||
+                c._py.replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, m => stripTone(m)).includes(q) ||
+                (c.tr || '').toLowerCase().includes(q);
+    row.style.display = hit ? '' : 'none';
+  });
+});
+
+/* ================= display preferences ================= */
+function applyDisplayPrefs() {
+  const el = $('subList');
+  el.className = 'py-' + prefs.py + (prefs.tr ? '' : ' tr-off') + (prefs.chal ? ' chal' : '');
+  document.documentElement.style.setProperty('--hz', prefs.fontHz + 'px');
+  document.documentElement.style.setProperty('--py', Math.round(prefs.fontHz * 0.55) + 'px');
+  $('pPy').value = prefs.py;
+  $('pTr').checked = prefs.tr;
+  $('pChal').checked = prefs.chal;
+  $('pScroll').checked = prefs.scroll;
+  $('pFont').value = prefs.fontHz;
+  $('pPreset').value = prefs.preset;
+  $('pMode').value = prefs.mode === 'shadow' && SH.on ? 'shadow' : $('pMode').value;
+  $('pReps').value = String(prefs.reps);
+  $('pGap').value = String(prefs.gap);
+  renderSpeedBtns();
+}
+const PRESETS = { beginner: { py: 'all', tr: true }, inter: { py: 'click', tr: false }, adv: { py: 'off', tr: false } };
+$('pPreset').addEventListener('change', () => {
+  prefs.preset = $('pPreset').value;
+  if (PRESETS[prefs.preset]) { prefs.py = PRESETS[prefs.preset].py; prefs.tr = PRESETS[prefs.preset].tr; }
+  savePrefs(); applyDisplayPrefs();
+});
+$('pPy').addEventListener('change', () => { prefs.py = $('pPy').value; prefs.preset = 'custom'; savePrefs(); applyDisplayPrefs(); });
+$('pTr').addEventListener('change', () => { prefs.tr = $('pTr').checked; prefs.preset = 'custom'; savePrefs(); applyDisplayPrefs(); });
+$('pChal').addEventListener('change', () => {
+  prefs.chal = $('pChal').checked; savePrefs(); applyDisplayPrefs();
+  if (prefs.chal) toast('🎧 Thử thách nghe: chữ bị ẩn — nghe xong, bấm đúp vào câu để hiện.');
+  else document.querySelectorAll('#subList .cue.revealed').forEach(r => r.classList.remove('revealed'));
+});
+$('pScroll').addEventListener('change', () => { prefs.scroll = $('pScroll').checked; savePrefs(); });
+$('pFont').addEventListener('input', () => { prefs.fontHz = +$('pFont').value; savePrefs(); applyDisplayPrefs(); });
+function renderSpeedBtns() {
+  const rates = [0.5, 0.75, 1, 1.25, 1.5];
+  $('speedBtns').innerHTML = rates.map(r =>
+    '<button class="small' + (prefs.rate === r ? ' on' : '') + '" data-r="' + r + '">' + r + '×</button>').join('');
+}
+$('speedBtns').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  prefs.rate = +b.dataset.r; savePrefs();
+  try { yt.setPlaybackRate(prefs.rate); } catch (err) {}
+  renderSpeedBtns();
+});
+
+/* ================= word popup (shared vocabulary) ================= */
+function sentenceOf(line, word) {
+  const parts = line.split(/(?<=[。！？；.!?;])/);
+  return (parts.find(s => s.includes(word)) || line).trim();
+}
+function wordClicked(w, line, cell) {
+  if (playerState() === 1) { try { yt.pauseVideo(); } catch (e) {} }
+  const d = lookup(w);
+  const pyStr = d ? d[0] : pyOf(w);
+  const ex = (d && d[3]) ? d[3] : sentenceOf(line, w);
+  const vocab = read('crh-vocab', {});
+  const saved = vocab[w];
+  const pop = $('popup');
+  pop.innerHTML =
+    '<button class="close" id="ppClose">✕</button>' +
+    '<div><span class="w">' + escH(w) + '</span><span class="p">' + escH(pyStr) + '</span> ' +
+    '<span class="lv lv' + (d ? d[2] : 0) + '">' + (d && d[2] ? 'HSK ' + d[2] : 'ngoài HSK') + '</span></div>' +
+    '<div class="m">' + (d ? escH(d[1]) : '<span class="mutetext">Không có trong từ điển HSK — bạn vẫn có thể lưu và tự ghi nghĩa.</span>') + '</div>' +
+    (ex && ex !== w ? '<div class="ex">' + escH(ex) + '</div>' : '') +
+    (saved && saved.note ? '<div class="mutetext">📝 ' + escH(saved.note) + '</div>' : '') +
+    '<div class="row" style="margin-top:10px">' +
+      '<button class="small" id="ppAudio">🔊 Nghe</button>' +
+      '<button class="small primary" id="ppSave">' + (saved ? '✓ Đã lưu' : '💾 Lưu từ') + '</button>' +
+      '<button class="small" id="ppNote">📝 Ghi chú</button>' +
+      '<button class="small" id="ppKnown">' + (saved && saved.status === 'known' ? '↩ Chưa thuộc' : '✓ Đã biết') + '</button>' +
+    '</div>';
+  pop.style.display = 'block';
+  const r = cell.getBoundingClientRect();
+  let x = Math.min(window.innerWidth - pop.offsetWidth - 10, Math.max(10, r.left));
+  let y = r.bottom + 8;
+  if (y + pop.offsetHeight > window.innerHeight - 10) y = Math.max(10, r.top - pop.offsetHeight - 8);
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  $('ppClose').onclick = hidePopup;
+  $('ppAudio').onclick = () => speak(w);
+  $('ppSave').onclick = () => { saveWord(w, pyStr, d ? d[1] : '', d ? d[2] : 0, ex); hidePopup(); updateSavedMarks(); };
+  $('ppNote').onclick = () => {
+    const note = prompt('Ghi chú cho từ "' + w + '":', saved ? saved.note || '' : '');
+    if (note === null) return;
+    saveWord(w, pyStr, d ? d[1] : '', d ? d[2] : 0, ex, note);
+    hidePopup(); updateSavedMarks();
+  };
+  $('ppKnown').onclick = () => {
+    saveWord(w, pyStr, d ? d[1] : '', d ? d[2] : 0, ex, undefined,
+      saved && saved.status === 'known' ? 'learning' : 'known');
+    hidePopup(); updateSavedMarks();
+  };
+}
+function hidePopup() { $('popup').style.display = 'none'; }
+document.addEventListener('click', e => { if (!e.target.closest('#popup') && !e.target.closest('.tok.zh')) hidePopup(); });
+
+/* ================= bottom tabs: analysis / bookmarks / notes ================= */
+function showPTab(which) {
+  ['Ana', 'Bmk', 'Note'].forEach(k => {
+    $('tab' + k).classList.toggle('active', k === which);
+    $('panel' + k).classList.toggle('active', k === which);
+  });
+}
+$('tabAna').addEventListener('click', () => showPTab('Ana'));
+$('tabBmk').addEventListener('click', () => showPTab('Bmk'));
+$('tabNote').addEventListener('click', () => showPTab('Note'));
+function showAna(i) {
+  const c = cues[i]; if (!c) return;
+  const toks = segment(c.zh).filter(t => t.zh);
+  let rows = '';
+  for (const t of toks) {
+    const d = lookup(t.w);
+    rows += '<tr><td class="w">' + escH(t.w) + '</td><td style="color:var(--accent)">' + escH(d ? d[0] : pyOf(t.w)) + '</td>' +
+      '<td>' + escH(d ? d[1] : '—') + '</td><td><span class="lv lv' + (d ? d[2] : 0) + '">' + (d && d[2] ? 'HSK ' + d[2] : 'ngoài HSK') + '</span></td></tr>';
+  }
+  $('anaBody').innerHTML =
+    '<div class="row" style="margin:4px 0 8px"><b style="font-family:var(--hz-font);font-size:19px">' + escH(c.zh) + '</b>' +
+    '<button class="small" id="anaSpeak">🔊 Nghe</button><button class="small" id="anaSlow">🐢 Chậm</button></div>' +
+    (c.tr ? '<div class="mutetext" style="margin-bottom:8px">→ ' + escH(c.tr) + '</div>' : '') +
+    '<table class="anatable"><tbody>' + rows + '</tbody></table>' +
+    '<div class="mutetext" style="margin-top:8px">Bấm vào từng từ trong phụ đề để nghe, lưu vào sổ từ và ghi chú.</div>';
+  const sp = $('anaSpeak'); if (sp) sp.onclick = () => { try { yt.pauseVideo(); } catch (e) {} speak(c.zh); };
+  const sl = $('anaSlow'); if (sl) sl.onclick = () => { try { yt.pauseVideo(); } catch (e) {} speak(c.zh, -35); };
+}
+function renderBmk() {
+  if (!PROG || !PROG.bookmarks.length) { $('bmkList').innerHTML = '<span class="mutetext">Chưa có câu nào được đánh dấu — bấm 🔖 ở câu bạn muốn xem lại.</span>'; return; }
+  $('bmkList').innerHTML = PROG.bookmarks.map(i => {
+    const c = cues[i]; if (!c) return '';
+    return '<div class="bmkrow"><span class="mutetext">' + fmtT(c.a) + '</span>' +
+      '<div class="grow"><div class="zh" data-i="' + i + '">' + escH(c.zh) + '</div>' +
+      (PROG.notes[i] ? '<div class="note">📝 ' + escH(PROG.notes[i]) + '</div>' : '') + '</div>' +
+      '<button class="small" data-del="' + i + '">✕</button></div>';
+  }).join('');
+}
+$('bmkList').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if (del) { const i = +del.dataset.del; PROG.bookmarks = PROG.bookmarks.filter(x => x !== i); scheduleProgPush(); renderBmk(); refreshCueMarks(); return; }
+  const z = e.target.closest('.zh[data-i]');
+  if (z) { const i = +z.dataset.i; if (SH.on) playCue(i, true); else seekPlay(cues[i].a); }
+});
+function renderNotes() {
+  const keys = PROG ? Object.keys(PROG.notes) : [];
+  if (!keys.length) { $('noteList').innerHTML = '<span class="mutetext">Chưa có ghi chú — bấm 📝 ở một câu để ghi chú ngữ pháp, cách dịch…</span>'; return; }
+  $('noteList').innerHTML = keys.sort((a, b) => a - b).map(i => {
+    const c = cues[i]; if (!c) return '';
+    return '<div class="bmkrow"><span class="mutetext">' + fmtT(c.a) + '</span>' +
+      '<div class="grow"><div class="zh" data-i="' + i + '">' + escH(c.zh) + '</div>' +
+      '<div class="note">' + escH(PROG.notes[i]) + '</div></div>' +
+      '<button class="small" data-edit="' + i + '">✏️</button></div>';
+  }).join('');
+}
+$('noteList').addEventListener('click', e => {
+  const ed = e.target.closest('[data-edit]');
+  if (ed) { cueAction('note', +ed.dataset.edit); return; }
+  const z = e.target.closest('.zh[data-i]');
+  if (z) { const i = +z.dataset.i; if (SH.on) playCue(i, true); else seekPlay(cues[i].a); }
+});
+
+/* ================= recording + pronunciation score ================= */
+let recIdx = -1, recorder = null, recChunks = [], recUrl = '', recStream = null, recT0 = 0, recDur = 0;
+let srEngine = null, srText = '';
+const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+function openRec(i) {
+  recIdx = i;
+  const c = cues[i]; if (!c) return;
+  try { yt.pauseVideo(); } catch (e) {}
+  $('recPanel').hidden = false;
+  $('recTarget').textContent = c.zh;
+  $('recResult').innerHTML = ''; $('recScore').innerHTML = '';
+  $('recStatus').textContent = SRClass
+    ? 'Bấm 🎙, nghe lại câu gốc trong đầu rồi đọc to — dừng lại để được chấm điểm.'
+    : 'Trình duyệt này không hỗ trợ chấm điểm tự động (hãy dùng Chrome) — bạn vẫn ghi âm và tự so sánh với bản gốc được.';
+  $('btnRecPlay').disabled = !recUrl;
+  $('recPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+$('recClose').addEventListener('click', () => { stopRec(); $('recPanel').hidden = true; });
+$('btnRecStart').addEventListener('click', async () => {
+  try {
+    recStream = recStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) { $('recStatus').textContent = '✗ Không truy cập được micro — hãy cho phép micro trong trình duyệt.'; return; }
+  recChunks = []; srText = '';
+  recorder = new MediaRecorder(recStream);
+  recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  recorder.onstop = () => {
+    recDur = (Date.now() - recT0) / 1000;
+    if (recUrl) URL.revokeObjectURL(recUrl);
+    recUrl = URL.createObjectURL(new Blob(recChunks, { type: recorder.mimeType || 'audio/webm' }));
+    $('btnRecPlay').disabled = false;
+    setTimeout(scoreRec, SRClass ? 700 : 0);   // give recognition a moment to deliver finals
+  };
+  recT0 = Date.now();
+  recorder.start();
+  if (SRClass) {
+    srEngine = new SRClass();
+    srEngine.lang = 'zh-CN'; srEngine.continuous = true; srEngine.interimResults = false;
+    srEngine.onresult = ev => { for (let k = ev.resultIndex; k < ev.results.length; k++) if (ev.results[k].isFinal) srText += ev.results[k][0].transcript; };
+    try { srEngine.start(); } catch (e) {}
+  }
+  $('btnRecStart').hidden = true; $('btnRecStop').hidden = false;
+  $('recPanel').classList.add('recording');
+  $('recStatus').textContent = '🔴 Đang ghi… đọc to câu trên rồi bấm ⏹.';
+});
+function stopRec() {
+  if (recorder && recorder.state !== 'inactive') recorder.stop();
+  if (srEngine) { try { srEngine.stop(); } catch (e) {} }
+  $('btnRecStart').hidden = false; $('btnRecStop').hidden = true;
+  $('recPanel').classList.remove('recording');
+}
+$('btnRecStop').addEventListener('click', stopRec);
+$('btnRecPlay').addEventListener('click', () => { if (recUrl) new Audio(recUrl).play(); });
+$('btnRecOrig').addEventListener('click', () => {
+  const c = cues[recIdx]; if (!c) return;
+  seekPlay(c.a);
+  setTimeout(() => { try { yt.pauseVideo(); } catch (e) {} }, (c.b - c.a) / prefs.rate * 1000 + 120);
+});
+const onlyHan = s => String(s || '').replace(/[^〇一-鿿㐀-䶿]/g, '');
+function lcsMatch(a, b) {           // returns set of matched indexes in a
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++)
+    dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+  const hit = new Set();
+  let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) { hit.add(i - 1); i--; j--; }
+    else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--;
+  }
+  return hit;
+}
+function scoreRec() {
+  const c = cues[recIdx]; if (!c) return;
+  if (!SRClass) { $('recStatus').textContent = '✓ Đã ghi xong — nghe lại và so sánh với bản gốc nhé.'; return; }
+  const target = onlyHan(c.zh), heard = onlyHan(srText);
+  if (!heard) { $('recStatus').textContent = '🤔 Không nhận dạng được giọng nói — thử đọc to, rõ hơn (và kiểm tra kết nối mạng).'; return; }
+  const hit = lcsMatch(target, heard);
+  const acc = target.length ? hit.size / target.length : 0;
+  const cueDur = (c.b - c.a);
+  const tempo = recDur > 0 ? cueDur / recDur : 1;      // >1: bạn nói nhanh hơn bản gốc
+  const tempoOk = Math.max(0, 1 - Math.abs(Math.log(Math.max(0.2, Math.min(5, tempo)))) / Math.log(2.5));
+  const score = Math.round(acc * 80 + tempoOk * 20);
+  $('recResult').innerHTML = [...target].map((ch, i2) =>
+    '<span class="' + (hit.has(i2) ? 'hit' : 'miss') + '">' + escH(ch) + '</span>').join('') +
+    '<div class="mutetext" style="font-size:13px;font-family:inherit">Máy nghe thấy: ' + escH(srText || '—') + '</div>';
+  const fb = score >= 85 ? '🌟 Tuyệt vời! Phát âm rất rõ.'
+    : score >= 65 ? '👍 Tốt! Chú ý những chữ gạch đỏ — nghe lại bản gốc rồi thử lần nữa.'
+    : '💪 Cứ luyện tiếp! Bấm 🐢 nghe bản đọc chậm, rồi đọc theo từng cụm nhỏ.';
+  $('recScore').innerHTML = 'Điểm: <b>' + score + '</b>/100 · Đúng ' + hit.size + '/' + target.length + ' chữ (' + Math.round(acc * 100) + '%) · Tốc độ của bạn ' +
+    (tempo > 1.15 ? 'nhanh hơn' : tempo < 0.85 ? 'chậm hơn' : 'sát') + ' bản gốc<br>' + fb;
+  $('recStatus').textContent = '';
+  bumpStat('shadow', Math.round(recDur));
+}
+/* ================= navigation ================= */
+let currentView = 'lib';
+const VIEWS = ['lib', 'practice', 'vocab', 'stats', 'admin'];
+function showView(name) {
+  currentView = name;
+  for (const v of VIEWS) {
+    const sec = document.getElementById('view-' + v);
+    if (sec) sec.classList.toggle('active', v === name);
+    const btn = document.getElementById('nav' + v[0].toUpperCase() + v.slice(1));
+    if (btn) btn.classList.toggle('active', v === name);
+  }
+  if (name === 'vocab') renderVocab();
+  if (name === 'stats') renderStats();
+  if (name === 'admin') renderAdmin();
+  if (name === 'practice' && !CUR) {
+    const last = VIDS.find(v => v.id === prefs.lastvid);
+    if (last) openVideo(last);
+  }
+  hidePopup();
+}
+$('navLib').addEventListener('click', () => showView('lib'));
+$('navPractice').addEventListener('click', () => showView('practice'));
+$('navVocab').addEventListener('click', () => showView('vocab'));
+$('navStats').addEventListener('click', () => showView('stats'));
+$('navAdmin').addEventListener('click', () => showView('admin'));
+
+/* ================= library ================= */
+let MYPROG = {};           // video_id -> {done, sentences}
+async function loadMyProgress() {
+  try {
+    const { data, error } = await sb.from('shadow_progress').select('video_id, done, sentences').eq('user_id', uid);
+    if (error) throw error;
+    MYPROG = {};
+    for (const r of data) MYPROG[r.video_id] = r;
+    store('myprog-cache', MYPROG);
+  } catch (e) { MYPROG = read('myprog-cache', {}); }
+}
+let libLvl = -1;
+function renderLibChips() {
+  const chips = [{ v: -1, t: 'Tất cả' }, { v: 1, t: 'HSK 1' }, { v: 2, t: 'HSK 2' }, { v: 3, t: 'HSK 3' },
+                 { v: 4, t: 'HSK 4' }, { v: 5, t: 'HSK 5' }, { v: 6, t: 'HSK 6' }, { v: 0, t: 'Chưa xếp' }];
+  $('lvChips').innerHTML = chips.map(c =>
+    '<span class="chip' + (libLvl === c.v ? ' active' : '') + '" data-v="' + c.v + '">' + c.t + '</span>').join('');
+}
+$('lvChips').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  libLvl = +c.dataset.v; renderLibrary();
+});
+$('libSearch').addEventListener('input', renderLibrary);
+function visibleVids() {
+  const list = VIDS.filter(v => v.published || v.created_by === uid);
+  if (ACCESS_READY)
+    list.sort((a, b) => ((a.sort_order || 0) - (b.sort_order || 0)) || String(a.created_at).localeCompare(String(b.created_at)));
+  return list;
+}
+function renderLibrary() {
+  renderLibChips();
+  freeOrderCache = null;
+  const q = $('libSearch').value.trim().toLowerCase();
+  let list = visibleVids();
+  if (libLvl >= 0) list = list.filter(v => (v.level || 0) === libLvl);
+  if (q) list = list.filter(v => (v.title || '').toLowerCase().includes(q));
+  $('libGrid').innerHTML = list.map(v => {
+    const subs = v.subs || [];
+    const dur = subs.length ? subs[subs.length - 1].b : 0;
+    const p = MYPROG[v.id];
+    const lock = isLocked(v);
+    return '<div class="vcard' + (lock ? ' locked' : '') + '" data-id="' + v.id + '">' +
+      '<img loading="lazy" src="https://img.youtube.com/vi/' + escH(v.yt) + '/mqdefault.jpg" alt="">' +
+      (dur ? '<span class="dur">' + fmtT(dur) + '</span>' : '') +
+      (lock ? '<span class="done" style="background:linear-gradient(135deg,#f4d68a,#d9a53c);color:#713f12;">👑</span>'
+            : (p && p.done ? '<span class="done">✓ Xong</span>' : '')) +
+      '<div class="body"><h3>' + escH(v.title) + '</h3>' +
+      '<div class="meta"><span class="lv lv' + (v.level || 0) + '">' + (v.level ? 'HSK ' + v.level : 'chưa xếp') + '</span>' +
+      '<span>' + subs.length + ' câu</span>' +
+      (!v.published ? '<span>🔒 riêng tư</span>' : '') +
+      (p && p.sentences ? '<span>đã luyện ' + p.sentences + ' câu</span>' : '') +
+      (v.created_by === uid && !isStaff ? '<button class="small" data-del="' + v.id + '" title="Xóa video của tôi">🗑</button>' : '') +
+      '</div></div></div>';
+  }).join('');
+  $('libEmpty').hidden = list.length > 0;
+}
+$('libGrid').addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    e.stopPropagation();
+    if (!confirm('Xóa video này khỏi thư viện của bạn? Đánh dấu và ghi chú trong video cũng bị xóa.')) return;
+    try { await sb.from('shadow_videos').delete().eq('id', del.dataset.del); } catch (err) {}
+    VIDS = VIDS.filter(v => v.id !== del.dataset.del);
+    store('vids-cache', VIDS); renderLibrary();
+    return;
+  }
+  const card = e.target.closest('.vcard'); if (!card) return;
+  const v = VIDS.find(x => x.id === card.dataset.id);
+  if (v) openVideo(v);
+});
+
+/* ================= vocab view ================= */
+const statusOf = v => v.status || 'new';
+const statusLabel = v => ({ new: 'Mới', learning: 'Đang học', known: 'Đã thuộc' })[statusOf(v)] || 'Mới';
+['vSearch', 'vLvl', 'vStatus', 'vSort'].forEach(id => $(id).addEventListener('input', renderVocab));
+function renderVocab() {
+  const vocab = read('crh-vocab', {});
+  const q = $('vSearch').value.trim().toLowerCase();
+  const lv = +$('vLvl').value, st = $('vStatus').value, sort = $('vSort').value;
+  let list = Object.entries(vocab).map(([w, v]) => ({ w, ...v }));
+  const total = list.length;
+  if (q) list = list.filter(v => v.w.includes(q) || (v.p || '').toLowerCase().includes(q) || (v.m || '').toLowerCase().includes(q) || (v.note || '').toLowerCase().includes(q));
+  if (lv > 0) list = list.filter(v => v.lvl === lv);
+  if (lv === -1) list = list.filter(v => !v.lvl);
+  if (st) list = list.filter(v => statusOf(v) === st);
+  if (sort === 'date') list.sort((a, b) => b.added - a.added);
+  if (sort === 'dateAsc') list.sort((a, b) => a.added - b.added);
+  if (sort === 'level') list.sort((a, b) => (a.lvl || 9) - (b.lvl || 9));
+  $('vCount').textContent = list.length + ' / ' + total + ' từ';
+  $('vEmpty').hidden = total > 0;
+  $('vList').innerHTML = list.map(v =>
+    '<div class="vword" data-w="' + escH(v.w) + '">' +
+      '<div class="w">' + escH(v.w) + '</div>' +
+      '<div class="grow"><span class="p">' + escH(v.p || '') + '</span> ' +
+        '<span class="lv lv' + (v.lvl || 0) + '">' + (v.lvl ? 'HSK ' + v.lvl : 'ngoài HSK') + '</span> ' +
+        '<span class="status ' + statusOf(v) + '">' + statusLabel(v) + '</span>' +
+        '<div>' + escH(v.m || '') + '</div>' +
+        (v.note ? '<div class="note">📝 ' + escH(v.note) + '</div>' : '') +
+        (v.ex ? '<div class="ex">' + escH(v.ex) + '</div>' : '') +
+        '<div class="mutetext">Lưu ' + todayKey(v.added) + (v.srs && v.srs.reps ? ' · ôn ' + v.srs.reps + ' lần' : '') + '</div></div>' +
+      '<div style="display:flex;flex-direction:column;gap:5px">' +
+        '<button class="small" data-act="audio">🔊</button>' +
+        '<button class="small" data-act="note">📝</button>' +
+        '<button class="small" data-act="known" title="Đã thuộc / chưa thuộc">' + (v.status === 'known' ? '↩' : '✓') + '</button>' +
+        '<button class="small" data-act="del">🗑</button>' +
+      '</div></div>').join('');
+}
+$('vList').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const row = e.target.closest('.vword'); const w = row.dataset.w;
+  const vocab = read('crh-vocab', {});
+  const v = vocab[w]; if (!v) return;
+  if (btn.dataset.act === 'audio') speak(w);
+  if (btn.dataset.act === 'note') {
+    const note = prompt('Ghi chú cho từ "' + w + '":', v.note || '');
+    if (note === null) return;
+    saveWord(w, v.p, v.m, v.lvl, v.ex, note); renderVocab();
+  }
+  if (btn.dataset.act === 'known') {
+    saveWord(w, v.p, v.m, v.lvl, v.ex, undefined, v.status === 'known' ? 'learning' : 'known'); renderVocab();
+  }
+  if (btn.dataset.act === 'del') {
+    if (!confirm('Xóa từ "' + w + '" khỏi sổ từ vựng (cả bên Đọc hiểu HSK)?')) return;
+    delete vocab[w]; store('crh-vocab', vocab);
+    pushVocabDelete(w); renderVocab();
+  }
+});
+
+/* ================= stats, goals, badges ================= */
+function totals() {
+  const s = stats();
+  const t = { listen: 0, shadow: 0, sent: 0, done: 0, saved: 0 };
+  for (const k in s.days) { const d = s.days[k]; t.listen += d.listen || 0; t.shadow += d.shadow || 0; t.sent += d.sent || 0; t.done += d.done || 0; t.saved += d.saved || 0; }
+  return t;
+}
+function activeDay(d) { return d && ((d.listen || 0) + (d.shadow || 0) >= 60 || (d.sent || 0) >= 3); }
+function streak() {
+  const s = stats(); let n = 0;
+  const day = new Date();
+  if (!activeDay(s.days[todayKey()])) day.setDate(day.getDate() - 1);
+  while (activeDay(s.days[todayKey(day)])) { n++; day.setDate(day.getDate() - 1); }
+  return n;
+}
+function renderStats() {
+  const t = totals();
+  const vocabN = Object.keys(read('crh-vocab', {})).length;
+  const stk = streak();
+  const tile = (v, l) => '<div class="tile"><b>' + v + '</b><span>' + l + '</span></div>';
+  $('statTiles').innerHTML =
+    tile(fmtH(t.listen), '🎧 Tổng thời gian nghe') +
+    tile(fmtH(t.shadow), '🎙 Thời gian shadowing') +
+    tile(t.sent, '💬 Câu đã luyện') +
+    tile(t.done, '✅ Video hoàn thành') +
+    tile(vocabN, '📒 Từ đã lưu') +
+    tile(stk + ' 🔥', 'Chuỗi ngày luyện');
+  const s = stats();
+  let cols = '';
+  let maxMin = 1;
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = todayKey(d);
+    const row = s.days[k] || {};
+    const l = Math.round((row.listen || 0) / 60), sh = Math.round((row.shadow || 0) / 60);
+    days.push({ k, l, sh, lbl: (d.getDate()) + '/' + (d.getMonth() + 1) });
+    maxMin = Math.max(maxMin, l + sh);
+  }
+  for (const d of days) {
+    cols += '<div class="col" title="' + d.k + ': ' + d.l + 'p nghe + ' + d.sh + 'p shadowing">' +
+      '<div class="seg2" style="height:' + Math.round(d.sh / maxMin * 100) + '%"></div>' +
+      '<div class="seg1" style="height:' + Math.round(d.l / maxMin * 100) + '%"></div>' +
+      '<div class="lbl">' + d.lbl + '</div></div>';
+  }
+  $('statChart').innerHTML = cols;
+  $('gMin').value = GOALS.min;
+  $('gWords').value = GOALS.words;
+  renderToday();
+  renderBadges(t, vocabN, stk);
+}
+function renderToday() {
+  const d = stats().days[todayKey()] || {};
+  const min = Math.round(((d.listen || 0) + (d.shadow || 0)) / 60);
+  const words = d.saved || 0;
+  const bar = (v, g) => '<div class="goalbar"><div style="width:' + Math.min(100, g ? v / g * 100 : 0) + '%"></div></div>';
+  $('gToday').innerHTML =
+    '<div>⏱ Hôm nay: <b>' + min + '</b>/' + GOALS.min + ' phút ' + (min >= GOALS.min && GOALS.min ? '✅' : '') + '</div>' + bar(min, GOALS.min) +
+    '<div>📒 Từ mới hôm nay: <b>' + words + '</b>/' + GOALS.words + ' từ ' + (words >= GOALS.words && GOALS.words ? '✅' : '') + '</div>' + bar(words, GOALS.words);
+}
+$('gSave').addEventListener('click', () => {
+  GOALS = { min: Math.max(0, +$('gMin').value || 0), words: Math.max(0, +$('gWords').value || 0) };
+  pushGoals(); renderToday(); toast('🎯 Đã lưu mục tiêu');
+});
+function renderBadges(t, vocabN, stk) {
+  const hours = (t.listen + t.shadow) / 3600;
+  const defs = [
+    { ico: '🐣', n: 'Video đầu tiên', ok: t.done >= 1 }, { ico: '🎬', n: '5 video', ok: t.done >= 5 },
+    { ico: '🏆', n: '20 video', ok: t.done >= 20 },
+    { ico: '💬', n: '100 câu', ok: t.sent >= 100 }, { ico: '🗣', n: '500 câu', ok: t.sent >= 500 },
+    { ico: '🎤', n: '2000 câu', ok: t.sent >= 2000 },
+    { ico: '⏰', n: '1 giờ luyện', ok: hours >= 1 }, { ico: '⏳', n: '5 giờ', ok: hours >= 5 },
+    { ico: '🕰', n: '20 giờ', ok: hours >= 20 },
+    { ico: '📒', n: '10 từ', ok: vocabN >= 10 }, { ico: '📚', n: '50 từ', ok: vocabN >= 50 },
+    { ico: '🧠', n: '200 từ', ok: vocabN >= 200 },
+    { ico: '🔥', n: 'Chuỗi 3 ngày', ok: stk >= 3 }, { ico: '🔥🔥', n: 'Chuỗi 7 ngày', ok: stk >= 7 },
+    { ico: '🌋', n: 'Chuỗi 30 ngày', ok: stk >= 30 },
+  ];
+  $('badgeGrid').innerHTML = defs.map(b =>
+    '<div class="bdg' + (b.ok ? ' earn' : '') + '"><span class="ico">' + b.ico + '</span>' + b.n + '</div>').join('');
+}
+
+/* ================= admin ================= */
+function renderAdmin() {
+  if (!isStaff) return;
+  $('admList').innerHTML = VIDS.map(v =>
+    '<div class="admrow" data-id="' + v.id + '">' +
+      '<img src="https://img.youtube.com/vi/' + escH(v.yt) + '/default.jpg" alt="">' +
+      '<input class="grow admTitle" value="' + escH(v.title) + '" style="min-width:160px">' +
+      '<select class="admLvl">' + [0, 1, 2, 3, 4, 5, 6].map(l =>
+        '<option value="' + l + '"' + ((v.level || 0) === l ? ' selected' : '') + '>' + (l ? 'HSK ' + l : 'Chưa xếp') + '</option>').join('') + '</select>' +
+      (ACCESS_READY
+        ? '<input type="number" class="admOrd" value="' + (v.sort_order || 0) + '" min="0" style="width:64px" title="Thứ tự hiển thị — giới hạn Free đếm theo thứ tự này">' +
+          '<select class="admTier" title="Free hay Premium">' +
+            '<option value="free"' + (v.tier !== 'premium' ? ' selected' : '') + '>Free</option>' +
+            '<option value="premium"' + (v.tier === 'premium' ? ' selected' : '') + '>👑 Premium</option></select>'
+        : '') +
+      '<label class="toggle"><input type="checkbox" class="admPub"' + (v.published ? ' checked' : '') + '> chia sẻ</label>' +
+      '<span class="mutetext">' + (v.subs || []).length + ' câu</span>' +
+      '<button class="small admSave">💾 Lưu</button>' +
+      '<button class="small admDel">🗑</button>' +
+    '</div>').join('') || '<span class="mutetext">Chưa có video nào.</span>';
+}
+$('admList').addEventListener('click', async e => {
+  const row = e.target.closest('.admrow'); if (!row) return;
+  const id = row.dataset.id;
+  if (e.target.closest('.admSave')) {
+    const patch = { title: row.querySelector('.admTitle').value.trim(),
+      level: +row.querySelector('.admLvl').value, published: row.querySelector('.admPub').checked };
+    if (ACCESS_READY) {
+      patch.sort_order = Math.max(0, +row.querySelector('.admOrd').value || 0);
+      patch.tier = row.querySelector('.admTier').value;
+    }
+    const { error } = await sb.from('shadow_videos').update(patch).eq('id', id);
+    if (error) { toast('✗ ' + error.message); return; }
+    const v = VIDS.find(x => x.id === id); Object.assign(v, patch);
+    store('vids-cache', VIDS); renderLibrary(); toast('✓ Đã lưu');
+  }
+  if (e.target.closest('.admDel')) {
+    if (!confirm('Xóa video này cho MỌI học viên? Tiến độ, đánh dấu, ghi chú của học viên trong video cũng mất.')) return;
+    const { error } = await sb.from('shadow_videos').delete().eq('id', id);
+    if (error) { toast('✗ ' + error.message); return; }
+    VIDS = VIDS.filter(x => x.id !== id);
+    store('vids-cache', VIDS); renderAdmin(); renderLibrary(); toast('🗑 Đã xóa');
+  }
+});
+
+/* ================= init ================= */
+(async function boot() {
+  const user = await requireLogin();
+  if (!user) return;
+  loadPrefs();
+  $('impStatus').textContent = '⏳ Đang tải dữ liệu tài khoản…';
+  await Promise.all([loadVideos(), loadCloudDict(), loadSettings(), loadAccess(), pullVocab(), pullDays(), pullGoals(), loadMyProgress()]);
+  await loadDict();
+  rebuildDictIndex();
+  $('impStatus').textContent = '';
+  renderLibrary();
+  applyDisplayPrefs();
+})();
+})();
+</script>
+</body>
+</html>

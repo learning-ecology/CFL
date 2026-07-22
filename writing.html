@@ -1,0 +1,2609 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tập viết chữ Hán — 墨迹 MoJi · Learning Ecology</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script>
+  /* ---- module guard ----------------------------------------------------
+     This feature can be switched off per installation (Dashboard →
+     Tính năng). Students are sent back to the dashboard; the owner keeps
+     access so they can preview. Fails OPEN if app_modules is absent, so
+     the page keeps working on databases without migration38. */
+  (async function () {
+    try {
+      var res = await sb.from("app_modules").select("writing").eq("id", 1)
+                  .maybeSingle().then(function (r) { return r; }, function () { return null; });
+      if (!res || res.error || !res.data || res.data.writing !== false) return;
+      var s = await sb.auth.getSession();
+      var uid = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+      if (!uid) return;                       // login redirect handles it
+      var p = await sb.from("profiles").select("role").eq("id", uid).single();
+      if (p && p.data && p.data.role === "owner") return;   // owner may preview
+      location.replace("dashboard.html");
+    } catch (e) { /* never block the page on an unexpected error */ }
+  })();
+  </script>
+<!--
+  ============================================================================
+  MoJi (墨迹) — Chinese character learning through handwriting + SRS
+  Single-file app. All data is stored locally (localStorage). No account needed.
+
+  ONLINE SERVICES USED (only during auto-fill / first view of a character):
+   * Stroke data  : hanzi-writer-data via jsDelivr CDN (per-character JSON).
+                    Cached in localStorage -> works offline afterwards.
+   * Pinyin       : pinyin-pro library (CDN, loaded once; works offline after
+                    the browser caches it). Handles polyphonic characters.
+   * Traditional  : opencc-js library (CDN). Graceful fallback if unavailable.
+   * EN / VI text : MyMemory Translation API (https://mymemory.translated.net)
+                    - free, CORS-enabled, officially supports browser calls.
+   * Examples     : Tatoeba API (best effort; may fail due to CORS — the app
+                    degrades gracefully and lets the student type an example).
+  NO API KEYS are embedded. If you want higher quality Vietnamese translation
+  (Google Cloud Translation, DeepL, an LLM...) host a small serverless proxy
+  and paste its URL into Settings -> "Custom translation endpoint".
+  The endpoint must accept GET ?q=<text>&target=<vi|en> and return JSON
+  {"translation":"..."} with CORS enabled. Keep your key on the server side.
+  ============================================================================
+-->
+<style>
+:root{
+  --ui:1; --charscale:1;
+  --bg:#f5efe3; --panel:#fffdf6; --panel2:#f3ecdd; --ink:#2b2520; --muted:#8b7f6e;
+  --accent:#b03a2e; --accent-soft:#f3ddd8; --jade:#3e7e5b; --jade-soft:#ddeee4;
+  --gold:#b98a1d; --border:#e0d5bf; --shadow:0 2px 10px rgba(60,40,20,.08);
+  --canvas-bg:#fffef9; --grid:#e8c9b8; --danger:#c0392b; --ok:#2e7d4f;
+  --hint:#c9bda6;
+}
+[data-theme="dark"]{
+  --bg:#161311; --panel:#211d19; --panel2:#2a251f; --ink:#ece4d4; --muted:#9a8f7f;
+  --accent:#e2725b; --accent-soft:#43241e; --jade:#6fbf95; --jade-soft:#1e3a2c;
+  --gold:#d4a92f; --border:#3a332a; --shadow:0 2px 10px rgba(0,0,0,.35);
+  --canvas-bg:#1c1916; --grid:#5a4438; --danger:#e57368; --ok:#66bb87; --hint:#57503f;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html{font-size:calc(16px * var(--ui))}
+body{
+  background:var(--bg); color:var(--ink); min-height:100vh;
+  /* Latin/Vietnamese fonts FIRST so Vietnamese diacritics render correctly;
+     Chinese fonts follow as fallback for hanzi glyphs only */
+  font-family:Arial,"Helvetica Neue",Helvetica,"Times New Roman",system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  line-height:1.5;
+}
+.hanzi{font-family:"Noto Serif SC","Songti SC","Kaiti SC","KaiTi","STKaiti","SimSun",serif}
+button{font:inherit; cursor:pointer; color:inherit}
+input,select,textarea{
+  font:inherit; color:var(--ink); background:var(--canvas-bg);
+  border:1px solid var(--border); border-radius:8px; padding:.5rem .65rem; width:100%;
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent); outline-offset:1px}
+label{font-size:.82rem; color:var(--muted); display:block; margin:.6rem 0 .2rem; font-weight:600}
+a{color:var(--accent)}
+/* ---------- layout ---------- */
+header{
+  position:sticky; top:0; z-index:50; background:var(--panel);
+  border-bottom:2px solid var(--border); box-shadow:var(--shadow);
+}
+.hwrap{max-width:1060px; margin:0 auto; padding:.5rem .8rem; display:flex; align-items:center; gap:.7rem; flex-wrap:wrap}
+.logo{display:flex; align-items:center; gap:.55rem; font-weight:800; font-size:1.05rem; white-space:nowrap}
+.seal{
+  width:2.1rem; height:2.1rem; border-radius:6px; background:var(--accent); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:1.15rem; font-weight:400;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.35);
+}
+nav{display:flex; gap:.15rem; flex:1; overflow-x:auto; scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{
+  border:none; background:none; padding:.5rem .7rem; border-radius:8px; white-space:nowrap;
+  color:var(--muted); font-weight:600; font-size:.9rem;
+}
+nav button.active{background:var(--accent-soft); color:var(--accent)}
+nav button:hover{color:var(--accent)}
+.iconbtn{border:1px solid var(--border); background:var(--panel2); border-radius:8px; padding:.4rem .6rem; font-size:.95rem}
+main{max-width:1060px; margin:0 auto; padding:1rem .8rem 4rem}
+.view{display:none}
+.view.active{display:block}
+h2{font-size:1.25rem; margin:.2rem 0 .8rem; display:flex; align-items:center; gap:.5rem}
+h2 .zh{color:var(--accent); font-weight:400}
+h3{font-size:1rem; margin:.8rem 0 .4rem}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:1rem; box-shadow:var(--shadow); margin-bottom:1rem}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:.8rem}
+.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:.8rem}
+.grid4{display:grid; grid-template-columns:repeat(4,1fr); gap:.8rem}
+@media(max-width:760px){ .grid2,.grid3,.grid4{grid-template-columns:1fr 1fr} }
+@media(max-width:460px){ .grid3,.grid4{grid-template-columns:1fr 1fr} .grid2{grid-template-columns:1fr} }
+/* ---------- buttons ---------- */
+.btn{
+  border:1px solid var(--border); background:var(--panel2); color:var(--ink);
+  padding:.55rem 1rem; border-radius:10px; font-weight:600; font-size:.92rem;
+  display:inline-flex; align-items:center; gap:.4rem; transition:transform .05s;
+}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.btn.jade{background:var(--jade); border-color:var(--jade); color:#fff}
+.btn.ghost{background:none}
+.btn.danger{background:none; color:var(--danger); border-color:var(--danger)}
+.btn.sm{padding:.3rem .6rem; font-size:.8rem; border-radius:8px}
+.btnrow{display:flex; gap:.5rem; flex-wrap:wrap; align-items:center}
+/* ---------- badges / stats ---------- */
+.badge{display:inline-block; padding:.1rem .5rem; border-radius:99px; font-size:.72rem; font-weight:700; border:1px solid transparent}
+.b-new{background:var(--accent-soft); color:var(--accent)}
+.b-learning{background:#fdf0d0; color:#9a7314}
+[data-theme="dark"] .b-learning{background:#453a15; color:#e5c25a}
+.b-weak{background:#fde0e0; color:#b03030}
+[data-theme="dark"] .b-weak{background:#4a2222; color:#ef9a9a}
+.b-developing{background:#e0ecf9; color:#2a5d99}
+[data-theme="dark"] .b-developing{background:#1d3a54; color:#90c1ee}
+.b-strong{background:var(--jade-soft); color:var(--jade)}
+.b-mastered{background:#efe3c2; color:#8a6a10}
+[data-theme="dark"] .b-mastered{background:#4a3d14; color:#e8cc6c}
+.b-auto{background:var(--jade-soft); color:var(--jade); font-size:.62rem; vertical-align:middle; margin-left:.3rem}
+.b-hsk{background:var(--panel2); color:var(--muted); border-color:var(--border)}
+.statgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:.6rem}
+.stat{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:.7rem; text-align:center}
+.stat .n{font-size:1.5rem; font-weight:800; color:var(--accent)}
+.stat .l{font-size:.72rem; color:var(--muted); font-weight:600}
+.bar{height:.55rem; background:var(--panel2); border-radius:99px; overflow:hidden; border:1px solid var(--border)}
+.bar>div{height:100%; background:var(--jade); border-radius:99px; transition:width .3s}
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto}
+table{width:100%; border-collapse:collapse; font-size:.88rem}
+th,td{text-align:left; padding:.5rem .55rem; border-bottom:1px solid var(--border); vertical-align:middle}
+th{font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+tr:hover td{background:var(--panel2)}
+td .hanzi{font-size:1.3rem}
+/* ---------- canvas ---------- */
+.canvasbox{position:relative; margin:0 auto; touch-action:none; border-radius:12px; overflow:hidden;
+  border:2px solid var(--border); background:var(--canvas-bg); box-shadow:var(--shadow);
+  width:min(92vw, calc(20rem * var(--charscale))); aspect-ratio:1}
+.canvasbox.wide{width:min(92vw, calc(30rem * var(--charscale))); aspect-ratio:auto}
+.canvasbox canvas{position:absolute; inset:0; width:100%; height:100%; touch-action:none}
+.canvasbox .underlay{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+.charbig{font-size:calc(5.2rem * var(--charscale)); line-height:1.15; text-align:center}
+.strokeSvg{display:block}
+/* ---------- practice ---------- */
+.prompt-card{text-align:center; padding:1.2rem}
+.prompt-main{font-size:1.7rem; font-weight:700; margin:.3rem 0}
+.prompt-sub{color:var(--muted); font-size:.9rem}
+.progressline{display:flex; align-items:center; gap:.6rem; margin-bottom:.7rem; font-size:.85rem; color:var(--muted)}
+.progressline .bar{flex:1}
+.ratebtns{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:.5rem; margin-top:.8rem}
+.ratebtns button{border:1px solid var(--border); border-radius:10px; padding:.6rem .4rem; background:var(--panel2); font-weight:700; font-size:.82rem; line-height:1.25}
+.ratebtns button small{display:block; font-weight:400; color:var(--muted); font-size:.68rem}
+.ratebtns .r5{color:var(--ok)} .ratebtns .r4{color:var(--jade)} .ratebtns .r3{color:#c07f10}
+.ratebtns .r2{color:var(--danger)} .ratebtns .r1{color:var(--danger)}
+.answer-side{display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; align-items:flex-start}
+.answer-side .col{text-align:center}
+.answer-side .col .cap{font-size:.75rem; color:var(--muted); font-weight:600; margin-bottom:.3rem}
+.snapshot{border:2px dashed var(--border); border-radius:10px; background:var(--canvas-bg)}
+.hintline{margin:.5rem auto; font-size:.9rem; color:var(--gold); min-height:1.3em; text-align:center}
+.stepdots{display:flex; gap:.35rem; justify-content:center; margin:.4rem 0}
+.stepdots span{width:.55rem; height:.55rem; border-radius:99px; background:var(--border)}
+.stepdots span.on{background:var(--accent)}
+kbd{background:var(--panel2); border:1px solid var(--border); border-bottom-width:2px; border-radius:5px; padding:0 .35rem; font-size:.78rem; font-family:inherit}
+/* ---------- forms / autofill ---------- */
+.field{position:relative}
+.field .src{position:absolute; right:.4rem; top:0; font-size:.62rem}
+.afstatus{display:flex; align-items:center; gap:.5rem; min-height:1.8rem; font-size:.85rem; color:var(--muted); flex-wrap:wrap}
+.spinner{width:1rem; height:1rem; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.chips{display:flex; gap:.4rem; flex-wrap:wrap; margin:.3rem 0}
+.chips button{border:1px solid var(--border); background:var(--panel2); border-radius:99px; padding:.2rem .7rem; font-size:.82rem}
+.chips button.sel{background:var(--accent); color:#fff; border-color:var(--accent)}
+.chips .star{color:var(--gold)}
+.warnbox{background:var(--accent-soft); color:var(--accent); border-radius:10px; padding:.55rem .8rem; font-size:.85rem; margin:.5rem 0}
+.infobox{background:var(--jade-soft); color:var(--jade); border-radius:10px; padding:.55rem .8rem; font-size:.85rem; margin:.5rem 0}
+/* ---------- toast & modal ---------- */
+#toasts{position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); z-index:200; display:flex; flex-direction:column; gap:.4rem; width:min(92vw,420px)}
+.toast{background:var(--ink); color:var(--bg); padding:.6rem .9rem; border-radius:10px; font-size:.88rem; box-shadow:var(--shadow); animation:pop .18s ease-out}
+.toast.err{background:var(--danger); color:#fff}
+.toast.ok{background:var(--jade); color:#fff}
+@keyframes pop{from{opacity:0; transform:translateY(8px)}to{opacity:1}}
+#modalback{position:fixed; inset:0; background:rgba(20,12,8,.5); z-index:150; display:none; align-items:center; justify-content:center; padding:1rem}
+#modalback.show{display:flex}
+#modal{background:var(--panel); border-radius:14px; max-width:520px; width:100%; max-height:85vh; overflow:auto; padding:1.1rem; border:1px solid var(--border)}
+#modal h3{margin-top:0}
+/* ---------- dashboard charts ---------- */
+.chart{display:flex; align-items:flex-end; gap:4px; height:110px; padding:.3rem 0}
+.chart .cb{flex:1; background:var(--jade); border-radius:4px 4px 0 0; min-width:6px; position:relative}
+.chart .cb.acc{background:var(--accent)}
+.chart .cb span{position:absolute; top:-1.15rem; left:50%; transform:translateX(-50%); font-size:.62rem; color:var(--muted); white-space:nowrap}
+.chartlabels{display:flex; gap:4px}
+.chartlabels div{flex:1; text-align:center; font-size:.6rem; color:var(--muted); min-width:6px; overflow:hidden}
+.rowitem{display:flex; justify-content:space-between; gap:.5rem; padding:.4rem 0; border-bottom:1px dashed var(--border); font-size:.88rem}
+.rowitem:last-child{border-bottom:none}
+.muted{color:var(--muted)} .small{font-size:.8rem}
+.center{text-align:center}
+.mt{margin-top:.8rem} .mb{margin-bottom:.8rem}
+details.entrydetail{margin-top:.3rem}
+details.entrydetail summary{cursor:pointer; color:var(--accent); font-size:.8rem}
+footer{
+  max-width:1060px; margin:0 auto; padding:1.2rem .8rem 2rem; text-align:center;
+  color:var(--muted); font-size:.85rem; border-top:1px solid var(--border);
+}
+footer a{color:var(--accent); font-weight:600; text-decoration:none}
+footer a:hover{text-decoration:underline}
+@media(max-width:600px){
+  .hwrap{padding:.4rem .5rem}
+  main{padding:.7rem .55rem 5rem}
+  .card{padding:.8rem; border-radius:12px}
+  th,td{padding:.4rem .35rem}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hwrap">
+    <div class="logo"><div class="seal hanzi">墨</div><span>MoJi <span class="muted small" data-i18n="logo_sub">Hanzi Trainer</span></span></div>
+    <nav id="nav">
+      <button data-view="dashboard" data-i18n="nav_dashboard">Dashboard</button>
+      <button data-view="dict" data-i18n="nav_dict">Dictionary</button>
+      <button data-view="add" data-i18n="nav_add">Add</button>
+      <button data-view="practice" data-i18n="nav_practice">Practice</button>
+      <button data-view="review" data-i18n="nav_review">Review Queue</button>
+      <button data-view="settings" data-i18n="nav_settings">Settings</button>
+    </nav>
+    <button class="iconbtn" id="langBtn" data-i18n-title="tip_lang" title="Ngôn ngữ / Language">VI</button>
+    <button class="iconbtn" id="themeBtn" data-i18n-title="tip_theme" title="Toggle light/dark mode">🌙</button>
+    <span class="iconbtn" id="cloudChip" style="cursor:default" title="Đồng bộ tài khoản">☁ …</span>
+    <a class="iconbtn" href="dashboard.html" style="text-decoration:none" title="Learning Ecology">←</a>
+  </div>
+</header>
+<main>
+
+<!-- ======================= DASHBOARD ======================= -->
+<section class="view" id="view-dashboard">
+  <h2><span data-i18n="dash_title">Progress Dashboard</span> <span class="zh hanzi">进度</span></h2>
+  <div class="statgrid" id="dashStats"></div>
+  <div class="grid2 mt">
+    <div class="card">
+      <h3 data-i18n="dash_vocab_status">Vocabulary status</h3>
+      <div id="dashStatus"></div>
+    </div>
+    <div class="card">
+      <h3 data-i18n="dash_upcoming">Upcoming reviews (next 7 days)</h3>
+      <div class="chart" id="dashUpcoming"></div>
+      <div class="chartlabels" id="dashUpcomingLbl"></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3 data-i18n="dash_acc">Accuracy over recent sessions</h3>
+      <div class="chart" id="dashAcc"></div>
+      <div class="chartlabels" id="dashAccLbl"></div>
+      <div class="small muted center" data-i18n="dash_acc_note">last sessions, % correct</div>
+    </div>
+    <div class="card">
+      <h3 data-i18n="dash_history">Recent practice history</h3>
+      <div id="dashHistory"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="btnrow">
+      <button class="btn primary" onclick="showView('practice')" data-i18n="dash_start">Start practising ✍️</button>
+      <button class="btn" onclick="showView('add')" data-i18n="dash_addvocab">Add vocabulary</button>
+      <button class="btn" id="dashResumeBtn" style="display:none" onclick="resumeSession()" data-i18n="resume_btn">▶ Resume session</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= DICTIONARY ======================= -->
+<section class="view" id="view-dict">
+  <h2><span data-i18n="dict_title">Personal Dictionary</span> <span class="zh hanzi">词典</span></h2>
+  <div class="card">
+    <div class="grid4">
+      <div><label data-i18n="lbl_search">Search</label><input id="dictSearch" data-i18n-ph="ph_search" placeholder="hanzi, pinyin, meaning…"></div>
+      <div><label data-i18n="lbl_deck">Deck</label><select id="dictDeck"></select></div>
+      <div><label data-i18n="lbl_status">Status</label><select id="dictStatus">
+        <option value="" data-i18n="opt_all">All</option>
+        <option value="New" data-i18n="st_New">New</option>
+        <option value="Learning" data-i18n="st_Learning">Learning</option>
+        <option value="Weak" data-i18n="st_Weak">Weak</option>
+        <option value="Developing" data-i18n="st_Developing">Developing</option>
+        <option value="Strong" data-i18n="st_Strong">Strong</option>
+        <option value="Mastered" data-i18n="st_Mastered">Mastered</option></select></div>
+      <div><label data-i18n="lbl_sort">Sort by</label><select id="dictSort">
+        <option value="added" data-i18n="sort_added">Date added (newest)</option>
+        <option value="due" data-i18n="sort_due">Next review</option>
+        <option value="hanzi" data-i18n="sort_hanzi">Character</option>
+        <option value="hsk" data-i18n="sort_hsk">HSK level</option>
+        <option value="mastery" data-i18n="sort_mastery">Mastery</option></select></div>
+    </div>
+    <div class="btnrow mt">
+      <button class="btn sm" onclick="exportCSV()" data-i18n="btn_export_csv">⬇ Export CSV</button>
+      <button class="btn sm" onclick="document.getElementById('csvFile').click()" data-i18n="btn_import_csv">⬆ Import CSV</button>
+      <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+      <span class="small muted" id="dictCount"></span>
+    </div>
+  </div>
+  <div class="card tablewrap"><table id="dictTable">
+    <thead><tr><th data-i18n="th_word">Word</th><th data-i18n="th_pinyin">Pinyin</th><th data-i18n="th_meaning">Meaning</th><th>HSK</th><th data-i18n="th_status">Status</th><th data-i18n="th_next">Next review</th><th></th></tr></thead>
+    <tbody id="dictBody"></tbody>
+  </table></div>
+</section>
+
+<!-- ======================= ADD / EDIT ======================= -->
+<section class="view" id="view-add">
+  <h2 id="addTitle">Add Vocabulary <span class="zh hanzi">加词</span></h2>
+  <div class="card">
+    <label data-i18n="lbl_simp">Simplified Chinese <span class="muted">(usually all you need to type)</span></label>
+    <div style="display:flex; gap:.5rem">
+      <input id="f_simp" class="hanzi" style="font-size:1.4rem" data-i18n-ph="ph_simp" placeholder="e.g. 学习" autocomplete="off">
+      <button class="btn primary" id="autofillBtn" onclick="runAutofill(false)" data-i18n="btn_autofill">✨ Auto-fill</button>
+    </div>
+    <div class="afstatus" id="afStatus"></div>
+    <div id="afWarn"></div>
+    <div id="pinyinChoices"></div>
+    <div id="meaningChoices"></div>
+    <div class="grid2">
+      <div class="field"><label data-i18n="lbl_trad">Traditional</label><span class="src" id="src_trad"></span><input id="f_trad" class="hanzi"></div>
+      <div class="field"><label data-i18n="lbl_pinyin">Pinyin (tone marks)</label><span class="src" id="src_pinyin"></span><input id="f_pinyin"></div>
+      <div class="field"><label data-i18n="lbl_vi">Vietnamese meaning</label><span class="src" id="src_vi"></span><input id="f_vi"></div>
+      <div class="field"><label data-i18n="lbl_en">English meaning</label><span class="src" id="src_en"></span><input id="f_en"></div>
+      <div class="field"><label data-i18n="lbl_pos">Part of speech</label><span class="src" id="src_pos"></span><input id="f_pos" data-i18n-ph="ph_pos" placeholder="noun, verb…"></div>
+      <div class="field"><label data-i18n="lbl_hsk">HSK level</label><span class="src" id="src_hsk"></span><select id="f_hsk">
+        <option value="" data-i18n="opt_unknown">unknown</option><option>1</option><option>2</option><option>3</option>
+        <option>4</option><option>5</option><option>6</option><option value="7">7–9</option></select></div>
+      <div class="field"><label data-i18n="lbl_strokes">Stroke count (per character)</label><span class="src" id="src_strokes"></span><input id="f_strokes" data-i18n-ph="ph_auto" placeholder="auto"></div>
+      <div class="field"><label data-i18n="lbl_deck_list">Deck / list</label><span class="src"></span>
+        <div style="display:flex; gap:.4rem"><select id="f_deck"></select><button class="btn sm" onclick="newDeckPrompt()">＋</button></div></div>
+      <div class="field"><label data-i18n="lbl_example">Example sentence (中文)</label><span class="src" id="src_example"></span><input id="f_example" class="hanzi"></div>
+      <div class="field"><label data-i18n="lbl_ex_pinyin">Example pinyin</label><span class="src" id="src_examplePinyin"></span><input id="f_examplePinyin"></div>
+      <div class="field"><label data-i18n="lbl_ex_vi">Example — Vietnamese</label><span class="src" id="src_exampleVi"></span><input id="f_exampleVi"></div>
+      <div class="field"><label data-i18n="lbl_ex_en">Example — English</label><span class="src" id="src_exampleEn"></span><input id="f_exampleEn"></div>
+      <div class="field"><label data-i18n="lbl_tags">Tags (comma separated)</label><input id="f_tags" data-i18n-ph="ph_tags" placeholder="food, lesson 3"></div>
+      <div class="field"><label data-i18n="lbl_note">Personal note</label><input id="f_note"></div>
+    </div>
+    <div class="btnrow mt">
+      <button class="btn primary" id="saveBtn" onclick="saveEntry()" disabled data-i18n="btn_save">💾 Save word</button>
+      <button class="btn" id="afRetryBtn" style="display:none" onclick="runAutofill(true)" data-i18n="btn_refresh_af">↻ Refresh auto-fill</button>
+      <button class="btn ghost" id="afCancelBtn" style="display:none" onclick="cancelAutofill()" data-i18n="btn_cancel_af">✕ Cancel auto-fill</button>
+      <button class="btn ghost" onclick="clearAddForm()" data-i18n="btn_clear_form">Clear form</button>
+      <button class="btn" onclick="speakField()" data-i18n="btn_pronounce">🔊 Pronounce</button>
+    </div>
+    <div class="small muted mt" data-i18n="add_note">Auto-filled fields are marked <span class="badge b-auto">AUTO</span> — always review them before saving. Fields that could not be retrieved stay empty for manual entry; nothing is ever invented.</div>
+  </div>
+
+  <div class="card">
+    <h3 data-i18n="bulk_title">Bulk add</h3>
+    <p class="small muted" data-i18n="bulk_desc">Paste several words — one per line or separated by commas / spaces. Each word is auto-filled separately.</p>
+    <textarea id="bulkInput" rows="3" class="hanzi" placeholder="爱&#10;朋友&#10;学校"></textarea>
+    <div class="btnrow mt">
+      <button class="btn primary" id="bulkBtn" onclick="startBulk()" data-i18n="btn_bulk">Process bulk list</button>
+      <button class="btn ghost" id="bulkCancelBtn" style="display:none" onclick="bulkCancel=true" data-i18n="btn_stop">Stop</button>
+    </div>
+    <div class="mt" id="bulkProgressWrap" style="display:none">
+      <div class="bar"><div id="bulkBar" style="width:0%"></div></div>
+      <div class="small muted mt" id="bulkStatus"></div>
+    </div>
+    <div id="bulkFailed"></div>
+  </div>
+</section>
+
+<!-- ======================= PRACTICE ======================= -->
+<section class="view" id="view-practice">
+  <h2><span data-i18n="practice_title">Practice</span> <span class="zh hanzi">练习</span></h2>
+  <div id="practiceSetup">
+    <div class="card" id="resumeCard" style="display:none">
+      <b data-i18n="unfinished">Unfinished session found.</b>
+      <div class="btnrow mt">
+        <button class="btn primary" onclick="resumeSession()" data-i18n="resume_btn">▶ Resume session</button>
+        <button class="btn ghost" onclick="discardSession()" data-i18n="btn_discard">Discard</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="statgrid" id="poolStats"></div>
+      <div class="grid4 mt">
+        <div><label data-i18n="lbl_deck">Deck</label><select id="p_deck"></select></div>
+        <div><label data-i18n="lbl_words_sel">Words</label><select id="p_pool">
+          <option value="due" data-i18n="pool_due">Due words</option>
+          <option value="new" data-i18n="pool_new">New words</option>
+          <option value="weak" data-i18n="pool_weak">Weak words</option>
+          <option value="all" data-i18n="pool_all">All words</option></select></div>
+        <div><label data-i18n="lbl_size">Session size</label><select id="p_count">
+          <option>5</option><option selected>10</option><option>15</option><option>20</option><option>30</option></select></div>
+        <div><label data-i18n="lbl_prompt">Prompt type</label><select id="p_prompt">
+          <option value="mix" data-i18n="prompt_mix">Random mix</option>
+          <option value="pinyin" data-i18n="prompt_pinyin">Pinyin</option>
+          <option value="vi" data-i18n="prompt_vi">Vietnamese</option>
+          <option value="en" data-i18n="prompt_en">English</option></select></div>
+      </div>
+      <label data-i18n="lbl_mode">Practice mode</label>
+      <div class="chips" id="p_modeChips">
+        <button data-m="guided" data-i18n="mode_guided">🎓 Guided learning</button>
+        <button data-m="recall" class="sel" data-i18n="mode_recall">🧠 Recall practice</button>
+        <button data-m="mixed" data-i18n="mode_mixed">🔀 Mixed</button>
+      </div>
+      <div class="btnrow mt">
+        <button class="btn primary" onclick="startSession()" data-i18n="btn_start_session">Start session ▶</button>
+      </div>
+      <div class="small muted mt" data-i18n="shortcuts_line">Shortcuts during practice: <kbd>Enter</kbd> submit · <kbd>H</kbd> hint · <kbd>U</kbd> undo · <kbd>C</kbd> clear · <kbd>Space</kbd> play/pause animation · <kbd>1</kbd>–<kbd>5</kbd> self-rating</div>
+    </div>
+  </div>
+
+  <div id="practiceSession" style="display:none">
+    <div class="progressline">
+      <button class="btn sm ghost" onclick="exitSession()" data-i18n="btn_exit">✕ Exit</button>
+      <div class="bar"><div id="sessBar" style="width:0%"></div></div>
+      <span id="sessCount"></span>
+    </div>
+    <div id="sessArea"></div>
+  </div>
+
+  <div id="practiceResults" style="display:none"></div>
+</section>
+
+<!-- ======================= REVIEW QUEUE ======================= -->
+<section class="view" id="view-review">
+  <h2><span data-i18n="review_title">Review Queue</span> <span class="zh hanzi">复习</span></h2>
+  <div class="card"><div class="btnrow">
+    <button class="btn primary" onclick="practiceDueNow()" data-i18n="btn_practice_due">Practise all due words ▶</button>
+    <span class="small muted" id="reviewCount"></span>
+  </div></div>
+  <div class="card tablewrap"><table>
+    <thead><tr><th data-i18n="th_word">Word</th><th data-i18n="th_pinyin">Pinyin</th><th data-i18n="th_meaning">Meaning</th><th data-i18n="th_status">Status</th><th data-i18n="th_due">Due</th><th data-i18n="th_attempts">Attempts</th></tr></thead>
+    <tbody id="reviewBody"></tbody>
+  </table></div>
+</section>
+
+<!-- ======================= SETTINGS ======================= -->
+<section class="view" id="view-settings">
+  <h2><span data-i18n="set_title">Settings</span> <span class="zh hanzi">设置</span></h2>
+  <div class="card">
+    <h3 data-i18n="set_appearance">Appearance</h3>
+    <div class="grid2">
+      <div><label>Ngôn ngữ / Language</label><select id="s_lang">
+        <option value="vi">Tiếng Việt</option><option value="en">English</option></select></div>
+      <div><label data-i18n="lbl_theme">Theme</label><select id="s_theme">
+        <option value="light" data-i18n="theme_light">Light</option>
+        <option value="dark" data-i18n="theme_dark">Dark</option>
+        <option value="auto" data-i18n="theme_auto">Follow system</option></select></div>
+      <div><label><span data-i18n="lbl_ui_size">Interface size</span> <span id="uiScaleVal"></span></label>
+        <input type="range" id="s_ui" min="0.85" max="1.35" step="0.05"></div>
+      <div><label><span data-i18n="lbl_char_size">Character / canvas size</span> <span id="charScaleVal"></span></label>
+        <input type="range" id="s_char" min="0.7" max="1.6" step="0.1"></div>
+      <div><label data-i18n="lbl_sound">Sound effects</label><select id="s_sound">
+        <option value="1" data-i18n="on">On</option><option value="0" data-i18n="off">Off</option></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 data-i18n="set_af">Auto-fill &amp; pronunciation</h3>
+    <div class="grid2">
+      <div><label data-i18n="lbl_auto_af">Auto-fill automatically while typing</label>
+        <select id="s_auto"><option value="1" data-i18n="auto_yes">Yes (after ~700 ms pause)</option><option value="0" data-i18n="auto_no">No — button only</option></select></div>
+      <div><label data-i18n="lbl_rate">Speech rate</label><input type="range" id="s_rate" min="0.5" max="1.3" step="0.1"></div>
+      <div><label data-i18n="lbl_endpoint">Custom translation endpoint <span class="muted">(optional)</span></label>
+        <input id="s_endpoint" placeholder="https://your-proxy.example.com/translate">
+        <div class="small muted" data-i18n="endpoint_note">GET ?q=&lt;text&gt;&amp;target=&lt;vi|en&gt; → {"translation":"…"}. Use this to plug in Google/DeepL/LLM via your own serverless proxy — never put API keys in this file.</div></div>
+      <div><label data-i18n="lbl_mm">MyMemory contact e-mail <span class="muted">(optional, raises free quota)</span></label>
+        <input id="s_email" placeholder="you@example.com"></div>
+    </div>
+    <div class="infobox" data-i18n="offline_note">Complete automatic Vietnamese translation needs internet access. Everything already saved (words, stroke data, audio via your device's speech engine) keeps working offline.</div>
+  </div>
+  <div class="card">
+    <h3 data-i18n="set_backup">Backup &amp; data</h3>
+    <div class="btnrow">
+      <button class="btn" onclick="exportJSON()" data-i18n="btn_export_json">⬇ Export everything (JSON)</button>
+      <button class="btn" onclick="document.getElementById('jsonFile').click()" data-i18n="btn_import_json">⬆ Import JSON backup</button>
+      <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+      <button class="btn" onclick="exportCSV()" data-i18n="btn_export_csv2">⬇ Export vocabulary (CSV)</button>
+    </div>
+    <div class="btnrow mt">
+      <button class="btn danger" onclick="removeSamples()" data-i18n="btn_rm_samples">Remove sample vocabulary</button>
+      <button class="btn danger" onclick="resetHistory()" data-i18n="btn_reset_hist">Reset practice history</button>
+      <button class="btn danger" onclick="deleteAll()" data-i18n="btn_del_all">Delete entire dictionary</button>
+    </div>
+    <div class="infobox mt" data-i18n="privacy_note">✓ Your dictionary and practice history are saved to your Learning Ecology account and synced across your devices. A copy also stays on this device, so everything keeps working offline — changes upload automatically when you are back online.</div>
+  </div>
+  <div class="card">
+    <h3 data-i18n="set_shortcuts">Keyboard shortcuts</h3>
+    <div class="small">
+      <div class="rowitem"><span data-i18n="sc_submit">Submit answer</span><span><kbd>Enter</kbd></span></div>
+      <div class="rowitem"><span data-i18n="sc_huc">Hint / Undo / Clear</span><span><kbd>H</kbd> <kbd>U</kbd> <kbd>C</kbd></span></div>
+      <div class="rowitem"><span data-i18n="sc_anim">Play / pause stroke animation</span><span><kbd>Space</kbd></span></div>
+      <div class="rowitem"><span data-i18n="sc_steps">Previous / next stroke</span><span><kbd>←</kbd> <kbd>→</kbd></span></div>
+      <div class="rowitem"><span data-i18n="sc_rate">Self-rating (Forgot → Easy)</span><span><kbd>1</kbd>–<kbd>5</kbd></span></div>
+      <div class="rowitem"><span data-i18n="sc_speak">Pronounce current word</span><span><kbd>P</kbd></span></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  Website được tạo bởi <b>Thầy Quốc Thông</b> ·
+  Zalo: <a href="https://zalo.me/0961923983" target="_blank" rel="noopener">0961 923 983</a>
+</footer>
+
+<div id="toasts"></div>
+<div id="modalback"><div id="modal"></div></div>
+<!-- External libraries (CDN). Each is optional — the app checks availability
+     and degrades gracefully (manual entry) if a library fails to load. -->
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.26.0/dist/index.min.js" onerror="window.__noPinyin=1"></script>
+<script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js" onerror="window.__noOpenCC=1"></script>
+<script>
+"use strict";
+/* ============================== STORAGE ================================= */
+let LS_KEY = "hanziApp.v1";        // re-pointed to a per-account slot after sign-in
+const HW_PREFIX = "hanziApp.hw.";   // cached stroke data per character
+const AF_PREFIX = "hanziApp.af.";   // cached auto-fill results per word
+
+const DEFAULT_SETTINGS = {
+  theme:"auto", uiScale:1, charScale:1, sound:true, autoAutofill:true,
+  ttsRate:0.9, endpoint:"", mmEmail:"", lang:"vi"
+};
+let state = {
+  entries:{},           // id -> entry object
+  order:[],             // ids, insertion order
+  decks:["General","HSK 1"],
+  settings:{...DEFAULT_SETTINGS},
+  sessions:[],          // finished session summaries
+  activeSession:null,   // serialized in-progress session (for Resume)
+  stats:{charsWritten:0},
+  samplesSeeded:false
+};
+function saveState(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch(e){ toast(t("t_storage_full"),"err"); }
+}
+let saveT=null;
+function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ saveState(); scheduleSync(); },250); }
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      state = {...state, ...s, settings:{...DEFAULT_SETTINGS, ...(s.settings||{})}};
+    }
+  }catch(e){ console.warn("state load failed", e); }
+}
+const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+/* ========================= INTERNATIONALISATION ==========================
+   Full UI translation. Default language: Vietnamese (learners are
+   Vietnamese). Switch via the VI/EN button in the header or in Settings.
+   t(key) -> string for current language; tf(key,{x:...}) fills {x} slots. */
+const I18N = {
+en: {
+  logo_sub:"Hanzi Trainer", badge_manual:"manual", tip_theme:"Light / dark mode", tip_lang:"Ngôn ngữ / Language",
+  nav_dashboard:"Dashboard", nav_dict:"Dictionary", nav_add:"Add", nav_practice:"Practice",
+  nav_review:"Review Queue", nav_settings:"Settings",
+  dash_title:"Progress Dashboard", dash_vocab_status:"Vocabulary status",
+  dash_upcoming:"Upcoming reviews (next 7 days)", dash_acc:"Accuracy over recent sessions",
+  dash_acc_note:"last sessions, % correct", dash_history:"Recent practice history",
+  dash_start:"Start practising ✍️", dash_addvocab:"Add vocabulary", resume_btn:"▶ Resume session",
+  lbl_total_words:"total words", lbl_due_today:"due today", lbl_new:"new", lbl_weak:"weak",
+  lbl_mastered:"mastered", lbl_streak:"day streak", lbl_sessions:"sessions", lbl_chars:"characters written",
+  lbl_due_now:"due now", lbl_total:"total", dash_no_sessions:"No sessions yet.",
+  dash_hist_empty:"Practice sessions will appear here.", lbl_words:"words", lbl_min:"min", today:"today",
+  st_New:"New", st_Learning:"Learning", st_Weak:"Weak", st_Developing:"Developing",
+  st_Strong:"Strong", st_Mastered:"Mastered",
+  dict_title:"Personal Dictionary", lbl_search:"Search", ph_search:"hanzi, pinyin, meaning…",
+  lbl_deck:"Deck", lbl_status:"Status", lbl_sort:"Sort by", opt_all:"All", all_decks:"All decks",
+  sort_added:"Date added (newest)", sort_due:"Next review", sort_hanzi:"Character",
+  sort_hsk:"HSK level", sort_mastery:"Mastery",
+  btn_export_csv:"⬇ Export CSV", btn_import_csv:"⬆ Import CSV",
+  th_word:"Word", th_pinyin:"Pinyin", th_meaning:"Meaning", th_status:"Status", th_next:"Next review",
+  th_due:"Due", th_attempts:"Attempts", th_hints:"Hints", th_last_rating:"Last rating",
+  words_count:"{n} word(s)", dict_empty:"No words yet — open <b>Add</b> to build your dictionary.",
+  details:"details", sample:"sample",
+  d_trad:"Traditional", d_pos:"Part of speech", d_strokes:"Strokes", d_tags:"Tags", d_note:"Note",
+  d_deck:"Deck", d_added:"Added", d_last:"Last review", d_attempts:"Attempts", d_correct:"Correct",
+  d_hints:"Hints", d_streak:"Streak",
+  tip_speak:"Pronounce", tip_edit:"Edit", tip_delete:"Delete",
+  add_title:"Add Vocabulary", edit_title:"Edit",
+  lbl_simp:'Simplified Chinese <span class="muted">(usually all you need to type)</span>',
+  ph_simp:"e.g. 学习", btn_autofill:"✨ Auto-fill",
+  lbl_trad:"Traditional", lbl_pinyin:"Pinyin (tone marks)", lbl_vi:"Vietnamese meaning",
+  lbl_en:"English meaning", lbl_pos:"Part of speech", ph_pos:"noun, verb…", lbl_hsk:"HSK level",
+  opt_unknown:"unknown", lbl_strokes:"Stroke count (per character)", ph_auto:"auto",
+  lbl_deck_list:"Deck / list", lbl_example:"Example sentence (中文)", lbl_ex_pinyin:"Example pinyin",
+  lbl_ex_vi:"Example — Vietnamese", lbl_ex_en:"Example — English",
+  lbl_tags:"Tags (comma separated)", ph_tags:"food, lesson 3", lbl_note:"Personal note",
+  btn_save:"💾 Save word", btn_refresh_af:"↻ Refresh auto-fill", btn_cancel_af:"✕ Cancel auto-fill",
+  btn_clear_form:"Clear form", btn_pronounce:"🔊 Pronounce",
+  add_note:'Auto-filled fields are marked <span class="badge b-auto">AUTO</span> — always review them before saving. Fields that could not be retrieved stay empty for manual entry; nothing is ever invented.',
+  bulk_title:"Bulk add", bulk_desc:"Paste several words — one per line or separated by commas / spaces. Each word is auto-filled separately.",
+  btn_bulk:"Process bulk list", btn_stop:"Stop",
+  af_type_first:"Type a word first.", af_invalid:"⚠ Please enter Chinese characters (hanzi).",
+  af_dup:'⚠ <b class="hanzi">{w}</b> is already in your dictionary (deck “{d}”). Saving will create a duplicate — consider editing the existing entry instead.',
+  btn_edit_existing:"Edit existing entry", af_looking:"Looking up", af_cancelled:"Auto-fill cancelled.",
+  af_cache_ok:"Loaded from local cache (offline-ready) ✓", af_ok:"Auto-fill complete ✓",
+  af_some_missing:"— some fields need you:", af_review_save:"— review the fields, then save.",
+  af_missing_head:"Could not retrieve:",
+  af_missing_tail:"Please fill these manually if you need them. Nothing was guessed or invented.",
+  af_failed:"⚠ Auto-fill failed (offline or service unreachable). You can fill the fields manually or retry.",
+  af_multi_pinyin:"Multiple pronunciations found", af_star_note:"(★ = most common — tap to choose)",
+  af_en_alts:"English alternatives", af_vi_alts:"Vietnamese alternatives",
+  af_overwrite_title:"Replace your manual edits?",
+  af_overwrite_body:"Auto-fill found new values for fields you edited yourself: <b>{f}</b>. Replace them?",
+  btn_keep_edits:"Keep my edits", btn_replace:"Replace",
+  miss_pinyin:"pinyin (pinyin-pro library not loaded — check internet)",
+  miss_trad:"traditional form (converter library not loaded)",
+  miss_strokes:"stroke count (stroke database unreachable)",
+  miss_en:"English meaning (translation service unreachable)",
+  miss_vi:"Vietnamese meaning (translation service unreachable)",
+  miss_pos:"part of speech (enter manually — no reliable free source)",
+  miss_ex_vi:"Vietnamese translation of the example",
+  miss_example:"example sentence (corpus unreachable — you can type your own)",
+  t_enter_chinese:"Please enter Chinese characters", dup_title:"Duplicate word",
+  dup_body:'<span class="hanzi">{w}</span> already exists. Save anyway as a second entry?',
+  t_saved:"Word saved ✓", t_updated:"Word updated ✓",
+  deck_new_title:"New deck / list", ph_deck:"e.g. HSK 2, Food words",
+  btn_cancel:"Cancel", btn_create:"Create", btn_close:"Close", btn_yes:"Yes, do it", btn_confirm:"Confirm",
+  t_bulk_none:"No Chinese words found in the box", bulk_processing:"Processing",
+  bulk_exists:" — already exists, skipped", bulk_done:"Done!", bulk_stopped:"Stopped.",
+  bulk_attention:"Items needing attention:", bulk_partial:"partial: {n} missing fields",
+  bulk_failed:"lookup failed (offline?)", btn_retry:"↻ Retry",
+  t_still_failing:"Still failing — check connection",
+  del_word_title:"Delete word?", del_word_body:'Delete <span class="hanzi">{w}</span> ({p}) and its practice history?',
+  t_deleted:"Deleted",
+  reset_title:"Reset practice history?",
+  reset_body:"All mastery levels, review dates, statistics and session history will be reset. Vocabulary itself is kept.",
+  t_reset_done:"Practice history reset",
+  delall_title:"Delete ENTIRE dictionary?",
+  delall_body:"Every word, deck and all progress will be permanently removed from this browser. Consider exporting a JSON backup first!",
+  t_delall_done:"Dictionary deleted",
+  samples_title:"Remove sample vocabulary?", samples_body:"{n} sample word(s) will be deleted. Your own words are kept.",
+  t_samples_removed:"Sample words removed", t_no_samples:"No sample words present",
+  t_backup_exported:"Backup exported", t_csv_exported:"CSV exported", t_csv_empty:"Empty CSV",
+  csv_done_title:"CSV import finished",
+  csv_done_body:"Added: <b>{a}</b> · Updated: <b>{u}</b> · Skipped (no valid hanzi): <b>{s}</b>",
+  csv_tip:"Tip: run Auto-fill on individual words later to complete any missing fields.",
+  t_cant_read:"Could not read file",
+  json_title:"Import backup?", json_body:"This replaces ALL current data with the backup contents.",
+  t_imported:"Backup imported", t_invalid_backup:"Invalid backup file",
+  t_storage_full:"Could not save — storage may be full. Export a backup!",
+  t_no_tts:"Speech synthesis not supported in this browser",
+  practice_title:"Practice", unfinished:"Unfinished session found.", btn_discard:"Discard",
+  lbl_words_sel:"Words", pool_due:"Due words", pool_new:"New words", pool_weak:"Weak words", pool_all:"All words",
+  lbl_size:"Session size", lbl_prompt:"Prompt type", prompt_mix:"Random mix", prompt_pinyin:"Pinyin",
+  prompt_vi:"Vietnamese", prompt_en:"English", lbl_mode:"Practice mode",
+  mode_guided:"🎓 Guided learning", mode_recall:"🧠 Recall practice", mode_mixed:"🔀 Mixed",
+  btn_start_session:"Start session ▶",
+  shortcuts_line:"Shortcuts during practice: <kbd>Enter</kbd> submit · <kbd>H</kbd> hint · <kbd>U</kbd> undo · <kbd>C</kbd> clear · <kbd>Space</kbd> play/pause animation · <kbd>1</kbd>–<kbd>5</kbd> self-rating",
+  btn_exit:"✕ Exit", t_no_matching:"No matching words — add vocabulary or change the filters",
+  t_paused:"Session paused — resume any time", t_no_resume:"No session to resume",
+  g_watch:"Watch the stroke order — character {i} of {n}:",
+  g_trace_strong:"Trace the character (strong hint)", g_trace_faint:"Trace again (faint hint)",
+  g_memory:"Write it from memory",
+  btn_pause:"⏸ Pause", btn_play:"▶ Play", btn_replay:"↻ Replay",
+  btn_prev_stroke:"⟨ Prev stroke", btn_next_stroke:"Next stroke ⟩", btn_start_trace:"Start tracing ➜",
+  btn_undo:"↶ Undo", btn_clear:"✕ Clear", btn_stroke_order:"▶ Stroke order", btn_next_step:"Next step ➜",
+  g_word:"Now write the whole word from memory:", btn_done:"Done ➜",
+  g_rate_q:"How well could you write it from memory?",
+  g_rate_note:"Your honest rating sets the next review date.",
+  g_anim_unavail:"⚠ Stroke animation unavailable (offline and not cached yet). The character is shown instead.",
+  g_anim_title:"Stroke order —", g_data_unavail:"Stroke data unavailable offline.",
+  pl_pinyin:"Pinyin", pl_vi:"Vietnamese meaning", pl_en:"English meaning", retry:"retry",
+  btn_hint:"💡 Hint", btn_forgot:"😞 I forgot", btn_submit:"Submit ➜",
+  hint1:"Hint 1: the word has {n} character(s).", hint2:"Hint 2: stroke count — {s}.",
+  hint2_none:"not recorded (edit the word to add it)", hint3:"Hint 3: here is the first stroke.",
+  hint4:"Hint 4: faint outline shown — trace it if needed.", hint5:"Hint 5: full answer revealed below.",
+  hint3_unavail:"First-stroke hint needs stroke data (offline & not cached). Try the outline hint.",
+  t_write_first:"Write your answer first, or press “I forgot”",
+  rv_study:"No problem — study it now:", rv_compare:"Compare with the correct answer",
+  rv_yours:"Your writing", rv_correct:"Correct — stroke order",
+  rv_stroke_match:"You drew {d} strokes — matches the expected {e}. ✓",
+  rv_stroke_diff:'You drew {d} stroke(s); <b class="hanzi">{w}</b> has {e}.',
+  rv_hints_used:"You used {n} hint(s) — the next interval will be reduced.",
+  rv_honest:"<b>Assess yourself honestly:</b> drawing something is not automatically “correct”. Check structure, stroke order, stroke count, shape and position.",
+  btn_continue_soon:"Continue — it will come back soon ➜", no_hint_after:"not available after hints",
+  r_forgot:"Forgot completely", r_incorrect:"Incorrect", r_almost:"Almost correct",
+  r_hard:"Correct, difficult", r_easy:"Correct and easy",
+  ri_forgot:"repeats now + 10 min", ri_incorrect:"1 day", ri_almost:"2 days", ri_hard:"4 days +", ri_easy:"7 days +",
+  ei_trad:"Traditional:", ei_strokes:"strokes", btn_word_audio:"🔊 Word", btn_example_audio:"🔊 Example",
+  res_done:"Session complete! 🎉", res_words:"words practised", res_acc:"accuracy",
+  res_correct:"correct answers", res_forgot:"marked “forgot”", res_nohint:"recalled without hints",
+  res_withhint:"recalled after hints", res_time:"practice time", res_chars:"characters written",
+  res_detail:"Detailed results", btn_again:"Practise again ▶", btn_view_dash:"View dashboard",
+  review_title:"Review Queue", btn_practice_due:"Practise all due words ▶",
+  rev_count:"{d} word(s) due · {s} coming up", upcoming_sep:"— upcoming —",
+  rev_empty:"Nothing due — well done! 🎉",
+  due_now:"due now", in_min:"in {n} min", in_h:"in {n} h", in_d:"in {n} d", new_lbl:"new",
+  set_title:"Settings", set_appearance:"Appearance", lbl_theme:"Theme",
+  theme_light:"Light", theme_dark:"Dark", theme_auto:"Follow system",
+  lbl_ui_size:"Interface size", lbl_char_size:"Character / canvas size", lbl_sound:"Sound effects",
+  on:"On", off:"Off", set_af:"Auto-fill & pronunciation",
+  lbl_auto_af:"Auto-fill automatically while typing",
+  auto_yes:"Yes (after ~700 ms pause)", auto_no:"No — button only", lbl_rate:"Speech rate",
+  lbl_endpoint:'Custom translation endpoint <span class="muted">(optional)</span>',
+  endpoint_note:'GET ?q=&lt;text&gt;&amp;target=&lt;vi|en&gt; → {"translation":"…"}. Use this to plug in Google/DeepL/LLM via your own serverless proxy — never put API keys in this file.',
+  lbl_mm:'MyMemory contact e-mail <span class="muted">(optional, raises free quota)</span>',
+  offline_note:"Complete automatic Vietnamese translation needs internet access. Everything already saved (words, stroke data, audio via your device's speech engine) keeps working offline.",
+  set_backup:"Backup & data",
+  btn_export_json:"⬇ Export everything (JSON)", btn_import_json:"⬆ Import JSON backup",
+  btn_export_csv2:"⬇ Export vocabulary (CSV)",
+  btn_rm_samples:"Remove sample vocabulary", btn_reset_hist:"Reset practice history",
+  btn_del_all:"Delete entire dictionary",
+  privacy_note:"✓ Your dictionary and practice history are saved to your Learning Ecology account and synced across your devices. A copy also stays on this device, so everything keeps working offline — changes upload automatically when you are back online.",
+  set_shortcuts:"Keyboard shortcuts", sc_submit:"Submit answer", sc_huc:"Hint / Undo / Clear",
+  sc_anim:"Play / pause stroke animation", sc_steps:"Previous / next stroke",
+  sc_rate:"Self-rating (Forgot → Easy)", sc_speak:"Pronounce current word"
+},
+vi: {
+  logo_sub:"Luyện viết chữ Hán", badge_manual:"tự nhập", tip_theme:"Chế độ sáng / tối", tip_lang:"Ngôn ngữ / Language",
+  nav_dashboard:"Tiến độ", nav_dict:"Từ điển", nav_add:"Thêm từ", nav_practice:"Luyện tập",
+  nav_review:"Chờ ôn", nav_settings:"Cài đặt",
+  dash_title:"Bảng tiến độ", dash_vocab_status:"Trạng thái từ vựng",
+  dash_upcoming:"Lịch ôn tập (7 ngày tới)", dash_acc:"Độ chính xác các buổi gần đây",
+  dash_acc_note:"các buổi gần nhất, % đúng", dash_history:"Lịch sử luyện tập gần đây",
+  dash_start:"Bắt đầu luyện tập ✍️", dash_addvocab:"Thêm từ vựng", resume_btn:"▶ Tiếp tục buổi học",
+  lbl_total_words:"tổng số từ", lbl_due_today:"đến hạn hôm nay", lbl_new:"từ mới", lbl_weak:"từ yếu",
+  lbl_mastered:"đã thuộc", lbl_streak:"chuỗi ngày học", lbl_sessions:"buổi luyện", lbl_chars:"chữ đã viết",
+  lbl_due_now:"đến hạn", lbl_total:"tổng cộng", dash_no_sessions:"Chưa có buổi luyện nào.",
+  dash_hist_empty:"Các buổi luyện tập sẽ hiện ở đây.", lbl_words:"từ", lbl_min:"phút", today:"hôm nay",
+  st_New:"Mới", st_Learning:"Đang học", st_Weak:"Yếu", st_Developing:"Tiến bộ",
+  st_Strong:"Vững", st_Mastered:"Đã thuộc",
+  dict_title:"Từ điển cá nhân", lbl_search:"Tìm kiếm", ph_search:"chữ Hán, pinyin, nghĩa…",
+  lbl_deck:"Bộ thẻ", lbl_status:"Trạng thái", lbl_sort:"Sắp xếp theo", opt_all:"Tất cả", all_decks:"Tất cả bộ thẻ",
+  sort_added:"Ngày thêm (mới nhất)", sort_due:"Hạn ôn tập", sort_hanzi:"Chữ Hán",
+  sort_hsk:"Cấp HSK", sort_mastery:"Mức độ thuộc",
+  btn_export_csv:"⬇ Xuất CSV", btn_import_csv:"⬆ Nhập CSV",
+  th_word:"Từ", th_pinyin:"Pinyin", th_meaning:"Nghĩa", th_status:"Trạng thái", th_next:"Hạn ôn",
+  th_due:"Hạn", th_attempts:"Lần luyện", th_hints:"Gợi ý", th_last_rating:"Đánh giá cuối",
+  words_count:"{n} từ", dict_empty:"Chưa có từ nào — vào mục <b>Thêm từ</b> để xây dựng từ điển của bạn.",
+  details:"chi tiết", sample:"mẫu",
+  d_trad:"Phồn thể", d_pos:"Từ loại", d_strokes:"Số nét", d_tags:"Nhãn", d_note:"Ghi chú",
+  d_deck:"Bộ thẻ", d_added:"Thêm ngày", d_last:"Ôn lần cuối", d_attempts:"Số lần luyện", d_correct:"Đúng",
+  d_hints:"Gợi ý", d_streak:"Chuỗi đúng",
+  tip_speak:"Phát âm", tip_edit:"Sửa", tip_delete:"Xoá",
+  add_title:"Thêm từ vựng", edit_title:"Sửa từ",
+  lbl_simp:'Chữ Hán giản thể <span class="muted">(thường chỉ cần nhập ô này)</span>',
+  ph_simp:"vd: 学习", btn_autofill:"✨ Tự động điền",
+  lbl_trad:"Phồn thể", lbl_pinyin:"Pinyin (dấu thanh)", lbl_vi:"Nghĩa tiếng Việt",
+  lbl_en:"Nghĩa tiếng Anh", lbl_pos:"Từ loại", ph_pos:"danh từ, động từ…", lbl_hsk:"Cấp HSK",
+  opt_unknown:"chưa rõ", lbl_strokes:"Số nét (từng chữ)", ph_auto:"tự động",
+  lbl_deck_list:"Bộ thẻ / danh sách", lbl_example:"Câu ví dụ (中文)", lbl_ex_pinyin:"Pinyin câu ví dụ",
+  lbl_ex_vi:"Ví dụ — tiếng Việt", lbl_ex_en:"Ví dụ — tiếng Anh",
+  lbl_tags:"Nhãn (cách nhau bằng dấu phẩy)", ph_tags:"đồ ăn, bài 3", lbl_note:"Ghi chú cá nhân",
+  btn_save:"💾 Lưu từ", btn_refresh_af:"↻ Điền lại tự động", btn_cancel_af:"✕ Huỷ tự động điền",
+  btn_clear_form:"Xoá biểu mẫu", btn_pronounce:"🔊 Phát âm",
+  add_note:'Các ô điền tự động được đánh dấu <span class="badge b-auto">AUTO</span> — hãy kiểm tra lại trước khi lưu. Ô nào không lấy được dữ liệu sẽ để trống cho bạn tự nhập; không bao giờ bịa thông tin.',
+  bulk_title:"Thêm hàng loạt", bulk_desc:"Dán nhiều từ — mỗi dòng một từ hoặc cách nhau bằng dấu phẩy / khoảng trắng. Mỗi từ sẽ được tự động điền riêng.",
+  btn_bulk:"Xử lý danh sách", btn_stop:"Dừng",
+  af_type_first:"Hãy nhập một từ trước.", af_invalid:"⚠ Vui lòng nhập chữ Hán.",
+  af_dup:'⚠ <b class="hanzi">{w}</b> đã có trong từ điển của bạn (bộ thẻ “{d}”). Lưu sẽ tạo bản trùng — nên sửa mục đã có.',
+  btn_edit_existing:"Sửa mục đã có", af_looking:"Đang tra cứu", af_cancelled:"Đã huỷ tự động điền.",
+  af_cache_ok:"Đã tải từ bộ nhớ máy (dùng được ngoại tuyến) ✓", af_ok:"Tự động điền xong ✓",
+  af_some_missing:"— một số ô cần bạn bổ sung:", af_review_save:"— hãy kiểm tra các ô rồi lưu.",
+  af_missing_head:"Không lấy được:",
+  af_missing_tail:"Bạn có thể tự nhập các mục này nếu cần. Không có thông tin nào bị bịa ra.",
+  af_failed:"⚠ Tự động điền thất bại (mất mạng hoặc dịch vụ không phản hồi). Bạn có thể tự nhập hoặc thử lại.",
+  af_multi_pinyin:"Tìm thấy nhiều cách đọc", af_star_note:"(★ = phổ biến nhất — chạm để chọn)",
+  af_en_alts:"Nghĩa tiếng Anh khác", af_vi_alts:"Nghĩa tiếng Việt khác",
+  af_overwrite_title:"Thay thế nội dung bạn đã sửa?",
+  af_overwrite_body:"Tự động điền tìm thấy giá trị mới cho các ô bạn đã tự sửa: <b>{f}</b>. Thay thế chứ?",
+  btn_keep_edits:"Giữ bản của tôi", btn_replace:"Thay thế",
+  miss_pinyin:"pinyin (thư viện pinyin-pro chưa tải được — hãy kiểm tra mạng)",
+  miss_trad:"dạng phồn thể (thư viện chuyển đổi chưa tải được)",
+  miss_strokes:"số nét (không truy cập được kho dữ liệu nét chữ)",
+  miss_en:"nghĩa tiếng Anh (dịch vụ dịch không phản hồi)",
+  miss_vi:"nghĩa tiếng Việt (dịch vụ dịch không phản hồi)",
+  miss_pos:"từ loại (hãy tự nhập — chưa có nguồn miễn phí đáng tin cậy)",
+  miss_ex_vi:"bản dịch tiếng Việt của câu ví dụ",
+  miss_example:"câu ví dụ (kho ngữ liệu không phản hồi — bạn có thể tự nhập)",
+  t_enter_chinese:"Vui lòng nhập chữ Hán", dup_title:"Từ bị trùng",
+  dup_body:'<span class="hanzi">{w}</span> đã tồn tại. Vẫn lưu thành mục thứ hai?',
+  t_saved:"Đã lưu từ ✓", t_updated:"Đã cập nhật ✓",
+  deck_new_title:"Bộ thẻ mới", ph_deck:"vd: HSK 2, Từ về đồ ăn",
+  btn_cancel:"Huỷ", btn_create:"Tạo", btn_close:"Đóng", btn_yes:"Đồng ý", btn_confirm:"Xác nhận",
+  t_bulk_none:"Không tìm thấy từ tiếng Trung trong ô nhập", bulk_processing:"Đang xử lý",
+  bulk_exists:" — đã có, bỏ qua", bulk_done:"Xong!", bulk_stopped:"Đã dừng.",
+  bulk_attention:"Các mục cần chú ý:", bulk_partial:"thiếu {n} trường thông tin",
+  bulk_failed:"tra cứu thất bại (mất mạng?)", btn_retry:"↻ Thử lại",
+  t_still_failing:"Vẫn lỗi — hãy kiểm tra kết nối mạng",
+  del_word_title:"Xoá từ này?", del_word_body:'Xoá <span class="hanzi">{w}</span> ({p}) cùng toàn bộ lịch sử luyện tập?',
+  t_deleted:"Đã xoá",
+  reset_title:"Đặt lại lịch sử luyện tập?",
+  reset_body:"Mọi mức độ thuộc, lịch ôn, thống kê và lịch sử buổi học sẽ bị đặt lại. Từ vựng vẫn được giữ nguyên.",
+  t_reset_done:"Đã đặt lại lịch sử luyện tập",
+  delall_title:"Xoá TOÀN BỘ từ điển?",
+  delall_body:"Mọi từ, bộ thẻ và tiến độ sẽ bị xoá vĩnh viễn khỏi trình duyệt này. Nên xuất bản sao lưu JSON trước!",
+  t_delall_done:"Đã xoá từ điển",
+  samples_title:"Xoá từ vựng mẫu?", samples_body:"{n} từ mẫu sẽ bị xoá. Từ của bạn được giữ nguyên.",
+  t_samples_removed:"Đã xoá từ mẫu", t_no_samples:"Không có từ mẫu nào",
+  t_backup_exported:"Đã xuất bản sao lưu", t_csv_exported:"Đã xuất CSV", t_csv_empty:"Tệp CSV rỗng",
+  csv_done_title:"Nhập CSV hoàn tất",
+  csv_done_body:"Đã thêm: <b>{a}</b> · Cập nhật: <b>{u}</b> · Bỏ qua (không có chữ Hán hợp lệ): <b>{s}</b>",
+  csv_tip:"Mẹo: sau này chạy Tự động điền cho từng từ để bổ sung các trường còn thiếu.",
+  t_cant_read:"Không đọc được tệp",
+  json_title:"Nhập bản sao lưu?", json_body:"Thao tác này sẽ thay thế TOÀN BỘ dữ liệu hiện tại bằng nội dung bản sao lưu.",
+  t_imported:"Đã nhập bản sao lưu", t_invalid_backup:"Tệp sao lưu không hợp lệ",
+  t_storage_full:"Không lưu được — bộ nhớ có thể đã đầy. Hãy xuất bản sao lưu!",
+  t_no_tts:"Trình duyệt này không hỗ trợ đọc giọng nói",
+  practice_title:"Luyện tập", unfinished:"Có buổi học chưa hoàn thành.", btn_discard:"Bỏ buổi này",
+  lbl_words_sel:"Chọn từ", pool_due:"Từ đến hạn", pool_new:"Từ mới", pool_weak:"Từ yếu", pool_all:"Tất cả từ",
+  lbl_size:"Số từ mỗi buổi", lbl_prompt:"Kiểu gợi nhắc", prompt_mix:"Ngẫu nhiên", prompt_pinyin:"Pinyin",
+  prompt_vi:"Tiếng Việt", prompt_en:"Tiếng Anh", lbl_mode:"Chế độ luyện",
+  mode_guided:"🎓 Học có hướng dẫn", mode_recall:"🧠 Luyện nhớ lại", mode_mixed:"🔀 Kết hợp",
+  btn_start_session:"Bắt đầu ▶",
+  shortcuts_line:"Phím tắt khi luyện tập: <kbd>Enter</kbd> nộp bài · <kbd>H</kbd> gợi ý · <kbd>U</kbd> hoàn tác · <kbd>C</kbd> xoá · <kbd>Space</kbd> phát/dừng hoạt ảnh · <kbd>1</kbd>–<kbd>5</kbd> tự đánh giá",
+  btn_exit:"✕ Thoát", t_no_matching:"Không có từ phù hợp — hãy thêm từ vựng hoặc đổi bộ lọc",
+  t_paused:"Đã tạm dừng buổi học — có thể tiếp tục bất cứ lúc nào", t_no_resume:"Không có buổi học nào để tiếp tục",
+  g_watch:"Xem thứ tự nét — chữ {i} trên {n}:",
+  g_trace_strong:"Tô theo chữ (gợi ý đậm)", g_trace_faint:"Tô lại (gợi ý mờ)",
+  g_memory:"Viết theo trí nhớ",
+  btn_pause:"⏸ Dừng", btn_play:"▶ Phát", btn_replay:"↻ Xem lại",
+  btn_prev_stroke:"⟨ Nét trước", btn_next_stroke:"Nét sau ⟩", btn_start_trace:"Bắt đầu tô ➜",
+  btn_undo:"↶ Hoàn tác", btn_clear:"✕ Xoá", btn_stroke_order:"▶ Thứ tự nét", btn_next_step:"Bước tiếp ➜",
+  g_word:"Giờ hãy viết cả từ theo trí nhớ:", btn_done:"Xong ➜",
+  g_rate_q:"Bạn viết theo trí nhớ tốt đến mức nào?",
+  g_rate_note:"Đánh giá trung thực sẽ quyết định ngày ôn tiếp theo.",
+  g_anim_unavail:"⚠ Không có hoạt ảnh nét chữ (đang ngoại tuyến và chưa lưu sẵn). Hiển thị chữ thay thế.",
+  g_anim_title:"Thứ tự nét —", g_data_unavail:"Không có dữ liệu nét chữ khi ngoại tuyến.",
+  pl_pinyin:"Pinyin", pl_vi:"Nghĩa tiếng Việt", pl_en:"Nghĩa tiếng Anh", retry:"luyện lại",
+  btn_hint:"💡 Gợi ý", btn_forgot:"😞 Tôi quên rồi", btn_submit:"Nộp bài ➜",
+  hint1:"Gợi ý 1: từ này có {n} chữ.", hint2:"Gợi ý 2: số nét — {s}.",
+  hint2_none:"chưa ghi (sửa từ để bổ sung)", hint3:"Gợi ý 3: đây là nét đầu tiên.",
+  hint4:"Gợi ý 4: đã hiện khung chữ mờ — có thể tô theo.", hint5:"Gợi ý 5: đáp án đầy đủ ở bên dưới.",
+  hint3_unavail:"Gợi ý nét đầu cần dữ liệu nét chữ (ngoại tuyến & chưa lưu). Hãy thử gợi ý khung mờ.",
+  t_write_first:"Hãy viết câu trả lời trước, hoặc bấm “Tôi quên rồi”",
+  rv_study:"Không sao — học lại ngay nhé:", rv_compare:"So sánh với đáp án đúng",
+  rv_yours:"Chữ bạn viết", rv_correct:"Đáp án — thứ tự nét",
+  rv_stroke_match:"Bạn viết {d} nét — khớp với {e} nét chuẩn. ✓",
+  rv_stroke_diff:'Bạn viết {d} nét; <b class="hanzi">{w}</b> có {e} nét.',
+  rv_hints_used:"Bạn đã dùng {n} gợi ý — khoảng ôn tiếp theo sẽ bị rút ngắn.",
+  rv_honest:"<b>Hãy tự đánh giá trung thực:</b> viết được gì đó không có nghĩa là “đúng”. Kiểm tra kết cấu, thứ tự nét, số nét, hình dáng và vị trí.",
+  btn_continue_soon:"Tiếp tục — từ này sẽ sớm quay lại ➜", no_hint_after:"không dùng được sau khi xem gợi ý",
+  r_forgot:"Quên hẳn", r_incorrect:"Sai", r_almost:"Gần đúng",
+  r_hard:"Đúng nhưng khó", r_easy:"Đúng và dễ",
+  ri_forgot:"lặp lại ngay + 10 phút", ri_incorrect:"1 ngày", ri_almost:"2 ngày", ri_hard:"4 ngày +", ri_easy:"7 ngày +",
+  ei_trad:"Phồn thể:", ei_strokes:"nét", btn_word_audio:"🔊 Từ", btn_example_audio:"🔊 Câu ví dụ",
+  res_done:"Hoàn thành buổi học! 🎉", res_words:"từ đã luyện", res_acc:"độ chính xác",
+  res_correct:"câu trả lời đúng", res_forgot:"đánh dấu “quên”", res_nohint:"nhớ không cần gợi ý",
+  res_withhint:"nhớ sau khi gợi ý", res_time:"thời gian luyện", res_chars:"chữ đã viết",
+  res_detail:"Kết quả chi tiết", btn_again:"Luyện tiếp ▶", btn_view_dash:"Xem bảng tiến độ",
+  review_title:"Hàng chờ ôn tập", btn_practice_due:"Ôn tất cả từ đến hạn ▶",
+  rev_count:"{d} từ đến hạn · {s} từ sắp tới", upcoming_sep:"— sắp tới —",
+  rev_empty:"Không có từ nào đến hạn — tuyệt vời! 🎉",
+  due_now:"đến hạn", in_min:"còn {n} phút", in_h:"còn {n} giờ", in_d:"còn {n} ngày", new_lbl:"mới",
+  set_title:"Cài đặt", set_appearance:"Giao diện", lbl_theme:"Chủ đề",
+  theme_light:"Sáng", theme_dark:"Tối", theme_auto:"Theo hệ thống",
+  lbl_ui_size:"Cỡ giao diện", lbl_char_size:"Cỡ chữ Hán / bảng viết", lbl_sound:"Hiệu ứng âm thanh",
+  on:"Bật", off:"Tắt", set_af:"Tự động điền & phát âm",
+  lbl_auto_af:"Tự động điền khi đang gõ",
+  auto_yes:"Có (sau khi ngừng gõ ~0,7 giây)", auto_no:"Không — chỉ dùng nút", lbl_rate:"Tốc độ đọc",
+  lbl_endpoint:'Điểm cuối dịch tuỳ chỉnh <span class="muted">(không bắt buộc)</span>',
+  endpoint_note:'GET ?q=&lt;text&gt;&amp;target=&lt;vi|en&gt; → {"translation":"…"}. Dùng để kết nối Google/DeepL/AI qua máy chủ trung gian của riêng bạn — tuyệt đối không đặt khoá API trong tệp này.',
+  lbl_mm:'E-mail liên hệ MyMemory <span class="muted">(không bắt buộc, tăng hạn mức miễn phí)</span>',
+  offline_note:"Dịch tự động sang tiếng Việt cần có internet. Mọi thứ đã lưu (từ vựng, dữ liệu nét chữ, phát âm bằng giọng đọc của thiết bị) vẫn dùng được khi ngoại tuyến.",
+  set_backup:"Sao lưu & dữ liệu",
+  btn_export_json:"⬇ Xuất toàn bộ (JSON)", btn_import_json:"⬆ Nhập bản sao lưu JSON",
+  btn_export_csv2:"⬇ Xuất từ vựng (CSV)",
+  btn_rm_samples:"Xoá từ vựng mẫu", btn_reset_hist:"Đặt lại lịch sử luyện tập",
+  btn_del_all:"Xoá toàn bộ từ điển",
+  privacy_note:"✓ Từ vựng và lịch sử luyện tập được lưu vào tài khoản Learning Ecology và tự đồng bộ giữa các thiết bị của bạn. Máy này vẫn giữ một bản sao nên ngoại tuyến vẫn học được — khi có mạng, thay đổi sẽ tự tải lên.",
+  set_shortcuts:"Phím tắt", sc_submit:"Nộp câu trả lời", sc_huc:"Gợi ý / Hoàn tác / Xoá",
+  sc_anim:"Phát / dừng hoạt ảnh nét chữ", sc_steps:"Nét trước / nét sau",
+  sc_rate:"Tự đánh giá (Quên → Dễ)", sc_speak:"Phát âm từ hiện tại"
+}
+};
+let LANG = "vi"; // default: Vietnamese (switchable in header or Settings)
+const t = k => (I18N[LANG] && I18N[LANG][k]) ?? I18N.en[k] ?? k;
+const tf = (k, vars={}) => Object.entries(vars).reduce((s,[a,b])=>s.split("{"+a+"}").join(b), t(k));
+function applyLangStatic(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ el.innerHTML = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el=>{ el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll("[data-i18n-title]").forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
+  const lb = document.getElementById("langBtn"); if(lb) lb.textContent = LANG.toUpperCase();
+}
+
+const now = ()=> Date.now();
+const DAY = 86400000;
+
+/* ============================== UTILS =================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isHan = ch => /\p{Script=Han}/u.test(ch);
+const hanChars = s => Array.from(s||"").filter(isHan);
+const onlyHan = s => hanChars(s).join("")===Array.from((s||"").replace(/\s/g,"")).join("") && hanChars(s).length>0;
+const fmtDate = t => t? new Date(t).toLocaleDateString() : "—";
+function fmtDue(ts){
+  if(!ts) return t("new_lbl");
+  const d = ts - now();
+  if(d<=0) return t("due_now");
+  if(d<3600000) return tf("in_min",{n:Math.ceil(d/60000)});
+  if(d<DAY) return tf("in_h",{n:Math.ceil(d/3600000)});
+  return tf("in_d",{n:Math.ceil(d/DAY)});
+}
+function toast(msg, cls=""){
+  const t = document.createElement("div");
+  t.className = "toast "+cls; t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(()=>{ t.style.opacity=0; t.style.transition="opacity .4s"; setTimeout(()=>t.remove(),400); }, 2600);
+}
+/* Generic modal. buttons: [{label, cls, cb}] */
+function modal(title, bodyHTML, buttons, opts={}){
+  const m = $("modal");
+  m.innerHTML = `<h3>${esc(title)}</h3><div class="mt">${bodyHTML}</div><div class="btnrow mt" id="modalBtns"></div>`;
+  (buttons||[{label:"OK",cls:"primary"}]).forEach(b=>{
+    const btn = document.createElement("button");
+    btn.className = "btn "+(b.cls||""); btn.innerHTML = b.label;
+    btn.onclick = ()=>{ closeModal(); b.cb && b.cb(); };
+    $("modalBtns").appendChild(btn);
+  });
+  $("modalback").classList.add("show");
+}
+function closeModal(){ $("modalback").classList.remove("show"); }
+$("modalback").addEventListener("click", e=>{ if(e.target.id==="modalback") closeModal(); });
+function confirmModal(title, body, cb, danger=true){
+  modal(title, `<p>${body}</p>`, [
+    {label:t("btn_cancel"), cls:"ghost"},
+    {label: danger?t("btn_yes"):t("btn_confirm"), cls: danger?"danger":"primary", cb}
+  ]);
+}
+
+/* ---------- tiny sound effects (WebAudio, no external files) ---------- */
+let audioCtx=null;
+function beep(freq=660, dur=0.08, type="sine", gain=0.06){
+  if(!state.settings.sound) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type=type; o.frequency.value=freq; g.gain.value=gain;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+dur);
+    o.stop(audioCtx.currentTime+dur+0.02);
+  }catch(e){}
+}
+const sfx = {
+  ok(){ beep(740,.09); setTimeout(()=>beep(988,.12),90); },
+  bad(){ beep(220,.18,"square",.05); },
+  click(){ beep(520,.04,"triangle",.04); }
+};
+
+/* ---------- speech synthesis (works offline with system voices) ---------- */
+let zhVoice=null;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  zhVoice = vs.find(v=>/zh[-_]CN/i.test(v.lang)) || vs.find(v=>/^zh/i.test(v.lang)) || null;
+}
+if("speechSynthesis" in window){
+  pickVoice(); speechSynthesis.onvoiceschanged = pickVoice;
+}
+function speak(text){
+  if(!text) return;
+  if(!("speechSynthesis" in window)){ toast(t("t_no_tts"),"err"); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "zh-CN"; if(zhVoice) u.voice = zhVoice;
+  u.rate = state.settings.ttsRate || 0.9;
+  speechSynthesis.speak(u);
+}
+function speakField(){ speak($("f_simp").value.trim()); }
+
+/* ================= HSK 3.0 BAND 1 LOOKUP (supplementary only) ============
+   This small built-in set is used ONLY to tag the HSK level — it is not the
+   auto-fill dictionary. Levels not covered here are left "unknown" and can
+   be set manually or supplied by a custom endpoint. */
+const HSK1_SET = new Set(("爱 爱好 八 爸爸 吧 白 白天 百 班 半 半年 半天 帮 帮忙 包 包子 杯 杯子 北 北边 北京 本 本子 比 别 别人 病 病人 不 不客气 不用 菜 茶 差 常常 唱 唱歌 车 车票 车站 吃 吃饭 出 出来 出去 穿 床 次 从 错 打 打车 打电话 打开 打球 大 大学 大学生 到 得到 的 等 地 地方 地点 地图 弟弟 第 点 电 电话 电脑 电视 电影 东 东边 东西 动 动作 都 读 读书 对 对不起 多 多少 饿 儿子 二 饭 饭店 房间 房子 放 放假 放学 飞 飞机 非常 分 风 干什么 干净 高 高兴 告诉 哥哥 个 给 跟 工作 关 关上 贵 国 国家 国外 过 还 还是 孩子 汉语 汉字 好 好吃 好看 好听 好玩儿 号 喝 和 很 后 后边 后天 花 话 坏 还 回 回答 回到 回家 回来 回去 会 火车 机场 机票 鸡蛋 几 家 家人 家里 见 见面 叫 教 教学楼 姐姐 介绍 今年 今天 进 进来 进去 九 就 觉得 开 开车 开会 开玩笑 看 看病 看见 看书 考 考试 渴 课 课本 课文 口 块 快 来 来到 老 老师 了 累 冷 里 里边 两 零 六 楼 楼上 楼下 路 路口 路上 妈妈 马路 吗 买 慢 忙 毛 没 没关系 没什么 没事儿 没有 妹妹 门 门口 门票 们 米饭 面包 面条 名字 明白 明天 明年 拿 哪 哪儿 哪里 那 那儿 那里 奶奶 男 男孩儿 男人 南 南边 难 呢 能 你 你们 年 女 女儿 女孩儿 女人 旁边 跑 朋友 票 七 起 起床 起来 汽车 前 前边 前天 钱 请 请假 请进 请问 去 去年 热 人 认识 认真 日 日期 肉 三 山 商场 商店 上 上班 上边 上车 上课 上网 上午 上学 谁 什么 身上 身体 生病 生气 生日 十 时候 时间 事 试 是 手 手机 书 书包 水 水果 睡 睡觉 说 说话 四 送 岁 他 他们 她 她们 太 天气 听 听到 听见 听写 同学 图书馆 外 外边 外国 外语 玩儿 晚 晚饭 晚上 网上 网友 忘 忘记 位 喂 问 我 我们 五 午饭 西 西边 洗 洗手间 喜欢 下 下班 下边 下车 下课 下午 下雨 先 先生 现在 想 小 小孩儿 小姐 小学 小学生 小时 笑 些 写 谢谢 新 新年 星期 星期日 星期天 行 休息 学 学生 学习 学校 学院 雪 也 页 一 一半 一起 一些 一样 衣服 医生 医院 椅子 亿 意思 因为 阴 音乐 银行 应该 用 有 有点儿 有名 有时候 有用 右 右边 雨 元 远 月 再 再见 在 在家 早 早饭 早上 怎么 站 找 找到 这 这儿 这里 真 真的 正在 知道 中 中国 中间 中午 中文 中学 中学生 重 住 准备 桌子 字 走 走路 最 最好 最后 昨天 左 左边 坐 坐下 做 做饭").split(/\s+/).filter(Boolean));
+function lookupHSK(word){ return HSK1_SET.has(word) ? "1" : ""; }
+
+/* ============================ ENTRY MODEL ================================ */
+function newEntry(data){
+  return {
+    id: uid(), simp:"", trad:"", pinyin:"", vi:"", en:"", pos:"", hsk:"",
+    strokes:"",                       // e.g. "7 + 6 = 13"
+    example:"", examplePinyin:"", exampleVi:"", exampleEn:"",
+    tags:[], note:"", deck:"General", sample:false,
+    autoFields:[],                    // which fields came from auto-fill
+    dateAdded: now(), lastReview:null, nextReview:null,
+    srs:{ interval:0, streak:0, attempts:0, correct:0, hints:0, lapses:0, history:[] },
+    ...data
+  };
+}
+function findBySimp(simp){ return state.order.map(i=>state.entries[i]).find(e=>e && e.simp===simp); }
+/* Status classification: New / Learning / Weak / Developing / Strong / Mastered */
+function entryStatus(e){
+  const s = e.srs;
+  if(!s.attempts) return "New";
+  const acc = s.correct/s.attempts;
+  if(s.interval>=30 && s.streak>=3) return "Mastered";
+  if(s.streak===0 && s.attempts>=2 && acc<0.6) return "Weak";
+  if(s.interval>=7) return "Strong";
+  if(s.interval>=2) return "Developing";
+  if(s.streak===0) return "Weak";
+  return "Learning";
+}
+const statusBadge = st => `<span class="badge b-${st.toLowerCase()}">${t("st_"+st)}</span>`;
+function allEntries(deck){
+  let list = state.order.map(i=>state.entries[i]).filter(Boolean);
+  if(deck) list = list.filter(e=>e.deck===deck);
+  return list;
+}
+const isDue  = e => e.srs.attempts>0 && e.nextReview && e.nextReview<=now();
+const isNew  = e => !e.srs.attempts;
+const isWeak = e => entryStatus(e)==="Weak";
+
+/* ---------------- sample vocabulary (real HSK-1 data, removable) -------- */
+const SAMPLES = [
+ {simp:"你好",trad:"你好",pinyin:"nǐ hǎo",vi:"xin chào",en:"hello",pos:"interjection",hsk:"1",strokes:"7 + 6 = 13",
+  example:"你好，我叫小明。",examplePinyin:"Nǐ hǎo, wǒ jiào Xiǎomíng.",exampleVi:"Xin chào, tôi tên là Tiểu Minh.",exampleEn:"Hello, my name is Xiaoming."},
+ {simp:"谢谢",trad:"謝謝",pinyin:"xièxie",vi:"cảm ơn",en:"thanks; thank you",pos:"verb",hsk:"1",strokes:"12 + 12 = 24",
+  example:"谢谢你的帮助。",examplePinyin:"Xièxie nǐ de bāngzhù.",exampleVi:"Cảm ơn sự giúp đỡ của bạn.",exampleEn:"Thank you for your help."},
+ {simp:"水",trad:"水",pinyin:"shuǐ",vi:"nước",en:"water",pos:"noun",hsk:"1",strokes:"4",
+  example:"我想喝水。",examplePinyin:"Wǒ xiǎng hē shuǐ.",exampleVi:"Tôi muốn uống nước.",exampleEn:"I want to drink water."},
+ {simp:"学生",trad:"學生",pinyin:"xuésheng",vi:"học sinh",en:"student",pos:"noun",hsk:"1",strokes:"8 + 5 = 13",
+  example:"我是学生。",examplePinyin:"Wǒ shì xuésheng.",exampleVi:"Tôi là học sinh.",exampleEn:"I am a student."},
+ {simp:"老师",trad:"老師",pinyin:"lǎoshī",vi:"giáo viên",en:"teacher",pos:"noun",hsk:"1",strokes:"6 + 6 = 12",
+  example:"她是我的老师。",examplePinyin:"Tā shì wǒ de lǎoshī.",exampleVi:"Cô ấy là giáo viên của tôi.",exampleEn:"She is my teacher."},
+ {simp:"中国",trad:"中國",pinyin:"Zhōngguó",vi:"Trung Quốc",en:"China",pos:"proper noun",hsk:"1",strokes:"4 + 8 = 12",
+  example:"我爱中国菜。",examplePinyin:"Wǒ ài Zhōngguó cài.",exampleVi:"Tôi thích món ăn Trung Quốc.",exampleEn:"I love Chinese food."},
+ {simp:"爱",trad:"愛",pinyin:"ài",vi:"yêu; yêu thích",en:"to love",pos:"verb",hsk:"1",strokes:"10",
+  example:"我爱你。",examplePinyin:"Wǒ ài nǐ.",exampleVi:"Tôi yêu bạn.",exampleEn:"I love you."},
+ {simp:"朋友",trad:"朋友",pinyin:"péngyou",vi:"bạn, bạn bè",en:"friend",pos:"noun",hsk:"1",strokes:"8 + 4 = 12",
+  example:"他是我的好朋友。",examplePinyin:"Tā shì wǒ de hǎo péngyou.",exampleVi:"Anh ấy là bạn tốt của tôi.",exampleEn:"He is my good friend."}
+];
+function seedSamples(){
+  if(state.samplesSeeded || state.order.length) return;
+  SAMPLES.forEach(s=>{
+    const e = newEntry({...s, deck:"HSK 1", sample:true, tags:["sample"]});
+    state.entries[e.id]=e; state.order.push(e.id);
+  });
+  state.samplesSeeded = true; save();
+}
+function removeSamples(){
+  const ids = state.order.filter(i=>state.entries[i]?.sample);
+  if(!ids.length){ toast(t("t_no_samples")); return; }
+  confirmModal(t("samples_title"), tf("samples_body",{n:ids.length}), ()=>{
+    ids.forEach(i=>{ delete state.entries[i]; });
+    state.order = state.order.filter(i=>state.entries[i]);
+    save(); renderAll(); toast(t("t_samples_removed"),"ok");
+  });
+}
+
+/* ========================= DICTIONARY VIEW ============================== */
+function renderDeckSelects(){
+  const opts = state.decks.map(d=>`<option>${esc(d)}</option>`).join("");
+  const keep = ["f_deck","p_deck","dictDeck"].map(id=>[id,$(id).value]);
+  $("f_deck").innerHTML = opts;
+  $("p_deck").innerHTML = `<option value="">${t("all_decks")}</option>`+opts;
+  $("dictDeck").innerHTML = `<option value="">${t("all_decks")}</option>`+opts;
+  keep.forEach(([id,v])=>{ if(v) $(id).value = v; });
+}
+function newDeckPrompt(){
+  modal(t("deck_new_title"), `<input id="deckName" placeholder="${t("ph_deck")}" maxlength="40">`, [
+    {label:t("btn_cancel"),cls:"ghost"},
+    {label:t("btn_create"),cls:"primary",cb:()=>{
+      const n = $("deckName").value.trim();
+      if(n && !state.decks.includes(n)){ state.decks.push(n); save(); renderDeckSelects(); $("f_deck").value=n; }
+    }}
+  ]);
+  setTimeout(()=>$("deckName")?.focus(),50);
+}
+function renderDict(){
+  const q = $("dictSearch").value.trim().toLowerCase();
+  const deck = $("dictDeck").value, st = $("dictStatus").value, sort = $("dictSort").value;
+  let list = allEntries(deck||null);
+  if(st) list = list.filter(e=>entryStatus(e)===st);
+  if(q) list = list.filter(e=> [e.simp,e.trad,e.pinyin,e.vi,e.en,(e.tags||[]).join(" "),e.note].join(" ").toLowerCase().includes(q));
+  const sorters = {
+    added:(a,b)=>b.dateAdded-a.dateAdded,
+    due:(a,b)=>(a.nextReview||9e15)-(b.nextReview||9e15),
+    hanzi:(a,b)=>a.simp.localeCompare(b.simp,"zh"),
+    hsk:(a,b)=>(a.hsk||"9").localeCompare(b.hsk||"9"),
+    mastery:(a,b)=>b.srs.interval-a.srs.interval
+  };
+  list.sort(sorters[sort]||sorters.added);
+  $("dictCount").textContent = tf("words_count",{n:list.length});
+  $("dictBody").innerHTML = list.map(e=>{
+    const stt = entryStatus(e);
+    return `<tr>
+      <td><span class="hanzi">${esc(e.simp)}</span>${e.sample?` <span class="badge b-hsk">${t("sample")}</span>`:''}
+        <details class="entrydetail"><summary>${t("details")}</summary>
+          <div class="small mt">
+            ${e.trad && e.trad!==e.simp ? `${t("d_trad")}: <span class="hanzi">${esc(e.trad)}</span><br>`:""}
+            ${e.pos?`${t("d_pos")}: ${esc(e.pos)}<br>`:""}
+            ${e.strokes?`${t("d_strokes")}: ${esc(e.strokes)}<br>`:""}
+            ${e.example?`<span class="hanzi">${esc(e.example)}</span><br>${esc(e.examplePinyin)}<br>🇻🇳 ${esc(e.exampleVi)}<br>🇬🇧 ${esc(e.exampleEn)}<br>`:""}
+            ${(e.tags||[]).length?`${t("d_tags")}: ${esc(e.tags.join(", "))}<br>`:""}
+            ${e.note?`${t("d_note")}: ${esc(e.note)}<br>`:""}
+            ${t("d_deck")}: ${esc(e.deck)} · ${t("d_added")} ${fmtDate(e.dateAdded)} · ${t("d_last")} ${fmtDate(e.lastReview)}<br>
+            ${t("d_attempts")} ${e.srs.attempts} · ${t("d_correct")} ${e.srs.correct} · ${t("d_hints")} ${e.srs.hints} · ${t("d_streak")} ${e.srs.streak}
+          </div></details></td>
+      <td>${esc(e.pinyin)}</td>
+      <td class="small">🇻🇳 ${esc(e.vi)}<br>🇬🇧 ${esc(e.en)}</td>
+      <td>${e.hsk?`<span class="badge b-hsk">HSK ${esc(e.hsk)}</span>`:"—"}</td>
+      <td>${statusBadge(stt)}</td>
+      <td class="small">${fmtDue(e.nextReview)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn sm ghost" title="${t("tip_speak")}" onclick="speak('${esc(e.simp)}')">🔊</button>
+        <button class="btn sm ghost" title="${t("tip_edit")}" onclick="editEntry('${e.id}')">✏️</button>
+        <button class="btn sm ghost" title="${t("tip_delete")}" onclick="deleteEntry('${e.id}')">🗑</button>
+      </td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="muted center">${t("dict_empty")}</td></tr>`;
+}
+function deleteEntry(id){
+  const e = state.entries[id]; if(!e) return;
+  confirmModal(t("del_word_title"), tf("del_word_body",{w:esc(e.simp), p:esc(e.pinyin)}), ()=>{
+    delete state.entries[id];
+    state.order = state.order.filter(i=>i!==id);
+    save(); renderAll(); toast(t("t_deleted"),"ok");
+  });
+}
+function resetHistory(){
+  confirmModal(t("reset_title"), t("reset_body"), ()=>{
+    allEntries().forEach(e=>{ e.srs={interval:0,streak:0,attempts:0,correct:0,hints:0,lapses:0,history:[]}; e.lastReview=null; e.nextReview=null; });
+    state.sessions=[]; state.stats={charsWritten:0}; state.activeSession=null;
+    save(); renderAll(); toast(t("t_reset_done"),"ok");
+  });
+}
+function deleteAll(){
+  confirmModal(t("delall_title"), t("delall_body"), ()=>{
+    state.entries={}; state.order=[]; state.sessions=[]; state.activeSession=null;
+    state.stats={charsWritten:0}; state.samplesSeeded=true;
+    save(); renderAll(); toast(t("t_delall_done"),"ok");
+  });
+}
+
+/* ===================== EXPORT / IMPORT (JSON & CSV) ====================== */
+function download(name, text, mime="application/octet-stream"){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text],{type:mime}));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+function exportJSON(){
+  download(`moji-backup-${new Date().toISOString().slice(0,10)}.json`,
+    JSON.stringify({app:"MoJi", version:1, exportedAt:new Date().toISOString(), state}, null, 1), "application/json");
+  toast(t("t_backup_exported"),"ok");
+}
+const CSV_COLS = ["simp","trad","pinyin","vi","en","pos","hsk","strokes","example","examplePinyin","exampleVi","exampleEn","tags","note","deck"];
+function exportCSV(){
+  const q = v => `"${String(v??"").replace(/"/g,'""')}"`;
+  const rows = [CSV_COLS.join(",")];
+  allEntries().forEach(e=> rows.push(CSV_COLS.map(c=> q(c==="tags"?(e.tags||[]).join(";"):e[c])).join(",")));
+  download(`moji-vocabulary-${new Date().toISOString().slice(0,10)}.csv`, "﻿"+rows.join("\r\n"), "text/csv;charset=utf-8");
+  toast(t("t_csv_exported"),"ok");
+}
+function parseCSV(text){ // small RFC-4180 parser
+  const rows=[]; let row=[], cur="", inQ=false;
+  text = text.replace(/^﻿/,"");
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else inQ=false; }
+      else cur+=c;
+    }else if(c==='"') inQ=true;
+    else if(c===","){ row.push(cur); cur=""; }
+    else if(c==="\n"||c==="\r"){ if(c==="\r"&&text[i+1]==="\n")i++; row.push(cur); rows.push(row); row=[]; cur=""; }
+    else cur+=c;
+  }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.length>1 || (r[0]&&r[0].trim()));
+}
+function importCSVFile(file){
+  file.text().then(text=>{
+    const rows = parseCSV(text);
+    if(!rows.length){ toast(t("t_csv_empty"),"err"); return; }
+    const header = rows[0].map(h=>h.trim());
+    const hasHeader = header.includes("simp") || header.includes("pinyin");
+    const idx = c => hasHeader ? header.indexOf(c) : CSV_COLS.indexOf(c);
+    let added=0, updated=0, skipped=0;
+    rows.slice(hasHeader?1:0).forEach(r=>{
+      const simp = (r[idx("simp")]||"").trim();
+      if(!simp || !hanChars(simp).length){ skipped++; return; }
+      let e = findBySimp(simp);
+      const isNewE = !e;
+      if(isNewE) e = newEntry({simp});
+      CSV_COLS.forEach(c=>{
+        if(c==="simp") return;
+        const v = (r[idx(c)]||"").trim();
+        if(!v) return;
+        if(c==="tags") e.tags = v.split(/[;,]/).map(s=>s.trim()).filter(Boolean);
+        else e[c]=v;
+      });
+      if(e.deck && !state.decks.includes(e.deck)) state.decks.push(e.deck);
+      if(isNewE){ state.entries[e.id]=e; state.order.push(e.id); added++; } else updated++;
+    });
+    save(); renderAll();
+    modal(t("csv_done_title"), `<p>${tf("csv_done_body",{a:added,u:updated,s:skipped})}</p>
+      <p class="small muted">${t("csv_tip")}</p>`);
+  }).catch(()=>toast(t("t_cant_read"),"err"));
+}
+function importJSONFile(file){
+  file.text().then(text=>{
+    const data = JSON.parse(text);
+    const st = data.state || data;
+    if(!st.entries || !st.order) throw 0;
+    confirmModal(t("json_title"), t("json_body"), ()=>{
+      state = {...state, ...st, settings:{...DEFAULT_SETTINGS, ...(st.settings||{})}};
+      save(); applySettings(); renderAll(); toast(t("t_imported"),"ok");
+    });
+  }).catch(()=>toast(t("t_invalid_backup"),"err"));
+}
+
+/* ============================ STROKE DATA ================================
+   Per-character stroke data (outline paths + medians) from the open
+   hanzi-writer-data project via jsDelivr. Each character is cached in
+   localStorage the first time, so previously saved words work offline. */
+function getCharData(ch){
+  const key = HW_PREFIX+ch;
+  try{ const c = localStorage.getItem(key); if(c) return Promise.resolve(JSON.parse(c)); }catch(e){}
+  return fetch("https://cdn.jsdelivr.net/npm/hanzi-writer-data@2/"+encodeURIComponent(ch)+".json")
+    .then(r=>{ if(!r.ok) throw new Error("no data"); return r.json(); })
+    .then(d=>{ try{ localStorage.setItem(key, JSON.stringify(d)); }catch(e){} return d; });
+}
+
+/* ======================= AUTO-FILL PIPELINE ==============================
+   Sources (see header comment): pinyin-pro (pinyin), opencc-js (traditional),
+   hanzi-writer-data (strokes), MyMemory API (EN/VI translations), Tatoeba
+   (example sentences, best effort), built-in HSK-1 tag list.
+   Results are cached locally; NOTHING is invented when a source fails —
+   the field is reported as missing and left for manual entry. */
+let occConverter = null;
+function getTrad(word){
+  try{
+    if(typeof OpenCC !== "undefined"){
+      occConverter = occConverter || OpenCC.Converter({from:"cn", to:"tw"});
+      return occConverter(word);
+    }
+  }catch(e){}
+  return null;
+}
+function getPinyin(word){
+  try{
+    if(typeof pinyinPro !== "undefined"){
+      const main = pinyinPro.pinyin(word, {toneType:"symbol"});
+      let choices = null;
+      if(hanChars(word).length===1){
+        const m = pinyinPro.pinyin(word, {toneType:"symbol", multiple:true, type:"array"});
+        if(Array.isArray(m) && m.length>1) choices = [...new Set(m)];
+      }
+      return {main, choices};
+    }
+  }catch(e){}
+  return null;
+}
+async function fetchTranslation(text, target, signal){
+  // 1) user-configured secure proxy endpoint (recommended for best quality)
+  const ep = state.settings.endpoint.trim();
+  if(ep){
+    const u = ep + (ep.includes("?")?"&":"?") + "q="+encodeURIComponent(text)+"&target="+target;
+    const r = await fetch(u, {signal});
+    if(!r.ok) throw new Error("endpoint error");
+    const j = await r.json();
+    if(j.translation) return {text:j.translation, alts:j.alternatives||[]};
+    throw new Error("endpoint bad response");
+  }
+  // 2) MyMemory — free, CORS-enabled, official browser support
+  let u = "https://api.mymemory.translated.net/get?q="+encodeURIComponent(text)+"&langpair=zh-CN|"+target;
+  const mail = state.settings.mmEmail.trim();
+  if(mail) u += "&de="+encodeURIComponent(mail);
+  const r = await fetch(u, {signal});
+  if(!r.ok) throw new Error("http "+r.status);
+  const j = await r.json();
+  const main = j.responseData && j.responseData.translatedText;
+  if(!main || j.responseStatus!==200) throw new Error("no translation");
+  const alts = [...new Set((j.matches||[]).map(m=>m.translation).filter(t=>t && t!==main))].slice(0,4);
+  return {text:main, alts};
+}
+async function fetchExample(word, signal){
+  // Tatoeba open corpus — may be blocked by CORS in some browsers; best effort.
+  const u = "https://tatoeba.org/eng/api_v0/search?from=cmn&to=eng&sort=relevance&query="+encodeURIComponent(word);
+  const r = await fetch(u, {signal});
+  if(!r.ok) throw new Error("tatoeba http");
+  const j = await r.json();
+  const res = (j.results||[]).find(s=> s.text && s.text.includes(word) && s.text.length<=26);
+  if(!res) throw new Error("no example");
+  let en = "";
+  (res.translations||[]).forEach(g=> (g||[]).forEach(t=>{ if(!en && t.lang==="eng") en = t.text; }));
+  return {zh:res.text, en};
+}
+/* Headless auto-fill for one word. Returns {data:{field:value}, choices, missing:[]} */
+async function fetchWordInfo(word, signal, force){
+  const cacheKey = AF_PREFIX+word;
+  if(!force){
+    try{ const c = localStorage.getItem(cacheKey); if(c) return {...JSON.parse(c), fromCache:true}; }catch(e){}
+  }
+  const data = {}, missing = [], choices = {};
+  // pinyin (local library — also works offline once the page is cached)
+  const py = getPinyin(word);
+  if(py){ data.pinyin = py.main; if(py.choices) choices.pinyin = py.choices; }
+  else missing.push("miss_pinyin");
+  // traditional
+  const trad = getTrad(word);
+  if(trad!==null) data.trad = trad;
+  else missing.push("miss_trad");
+  // strokes per character
+  try{
+    const counts = [];
+    for(const ch of hanChars(word)){
+      const d = await getCharData(ch);
+      counts.push(d.strokes.length);
+    }
+    data.strokes = counts.length>1 ? counts.join(" + ")+" = "+counts.reduce((a,b)=>a+b,0) : String(counts[0]||"");
+  }catch(e){ missing.push("miss_strokes"); }
+  // HSK tag (built-in band-1 list only; other levels stay editable)
+  data.hsk = lookupHSK(word);
+  // EN + VI meanings
+  try{
+    const en = await fetchTranslation(word, "en", signal);
+    data.en = en.text; if(en.alts.length) choices.en = en.alts;
+  }catch(e){ if(e.name==="AbortError") throw e; missing.push("miss_en"); }
+  try{
+    const vi = await fetchTranslation(word, "vi", signal);
+    data.vi = vi.text; if(vi.alts.length) choices.vi = vi.alts;
+  }catch(e){ if(e.name==="AbortError") throw e; missing.push("miss_vi"); }
+  // part of speech: no reliable free browser-side source -> manual (never guessed)
+  missing.push("miss_pos");
+  // example sentence + its translations
+  try{
+    const ex = await fetchExample(word, signal);
+    data.example = ex.zh;
+    if(ex.en) data.exampleEn = ex.en;
+    const pyx = getPinyin(ex.zh); if(pyx) data.examplePinyin = pyx.main;
+    try{ const exVi = await fetchTranslation(ex.zh, "vi", signal); data.exampleVi = exVi.text; }
+    catch(e){ if(e.name==="AbortError") throw e; missing.push("miss_ex_vi"); }
+  }catch(e){ if(e.name==="AbortError") throw e; missing.push("miss_example"); }
+  const result = {data, choices, missing};
+  try{ localStorage.setItem(cacheKey, JSON.stringify(result)); }catch(e){}
+  return result;
+}
+
+/* ------------------------- Add-form controller -------------------------- */
+const AF_FIELDS = ["trad","pinyin","vi","en","pos","hsk","strokes","example","examplePinyin","exampleVi","exampleEn"];
+let editingId = null;         // entry id when editing
+let editedFields = new Set(); // fields the student touched manually
+let autoFields = new Set();   // fields filled by auto-fill
+let afAbort = null;           // AbortController of a running auto-fill
+let afTimer = null;           // debounce timer
+let afLoadedFor = "";         // word the current form data belongs to
+
+function fieldEl(name){ return $("f_"+name); }
+function markSrc(name){
+  const el = $("src_"+name); if(!el) return;
+  el.innerHTML = autoFields.has(name) ? '<span class="badge b-auto">AUTO</span>' :
+                 editedFields.has(name) ? `<span class="badge b-hsk">${t("badge_manual")}</span>` : "";
+}
+function setFieldAuto(name, value){
+  if(value===undefined || value===null || value==="") return;
+  if(editedFields.has(name) && fieldEl(name).value.trim() !== ""){
+    pendingOverwrites.push({name, value}); return; // ask later, never silently overwrite
+  }
+  fieldEl(name).value = value;
+  autoFields.add(name); markSrc(name);
+}
+let pendingOverwrites = [];
+function afStatus(html){ $("afStatus").innerHTML = html; }
+function checkSaveReady(){
+  const simp = $("f_simp").value.trim();
+  const ok = hanChars(simp).length>0 && $("f_pinyin").value.trim() &&
+             ($("f_vi").value.trim() || $("f_en").value.trim()) && !afAbort;
+  $("saveBtn").disabled = !ok;
+}
+function cancelAutofill(){
+  if(afAbort){ afAbort.abort(); afAbort=null; }
+  afStatus(`<span class="muted">${t("af_cancelled")}</span>`);
+  $("afCancelBtn").style.display="none"; $("autofillBtn").disabled=false;
+  checkSaveReady();
+}
+function renderChoiceChips(containerId, title, list, common, onPick){
+  const box = $(containerId);
+  if(!list || !list.length){ box.innerHTML=""; return; }
+  box.innerHTML = `<label>${title} <span class="muted small">${t("af_star_note")}</span></label><div class="chips"></div>`;
+  const chipRow = box.querySelector(".chips");
+  list.forEach((v,i)=>{
+    const b = document.createElement("button");
+    b.innerHTML = (i===0?'<span class="star">★</span> ':"")+esc(v);
+    if(v===common) b.classList.add("sel");
+    b.onclick = ()=>{ chipRow.querySelectorAll("button").forEach(x=>x.classList.remove("sel")); b.classList.add("sel"); onPick(v); };
+    chipRow.appendChild(b);
+  });
+}
+async function runAutofill(force){
+  const word = $("f_simp").value.trim();
+  $("afWarn").innerHTML="";
+  if(!word){ afStatus(`<span class="muted">${t("af_type_first")}</span>`); return; }
+  if(!hanChars(word).length){
+    afStatus(`<span style="color:var(--danger)">${t("af_invalid")}</span>`); return;
+  }
+  // duplicate warning
+  const dup = findBySimp(word);
+  if(dup && dup.id!==editingId)
+    $("afWarn").innerHTML = `<div class="warnbox">${tf("af_dup",{w:esc(word), d:esc(dup.deck)})}
+      <button class="btn sm mt" onclick="editEntry('${dup.id}')">${t("btn_edit_existing")}</button></div>`;
+  if(afAbort) afAbort.abort();
+  afAbort = new AbortController();
+  pendingOverwrites = [];
+  $("autofillBtn").disabled = true; $("afCancelBtn").style.display=""; $("afRetryBtn").style.display="none";
+  $("saveBtn").disabled = true;
+  afStatus(`<span class="spinner"></span> ${t("af_looking")} <b class="hanzi">${esc(word)}</b>…`);
+  try{
+    const info = await fetchWordInfo(word, afAbort.signal, !!force);
+    afAbort = null;
+    afLoadedFor = word;
+    for(const [k,v] of Object.entries(info.data)) setFieldAuto(k, v);
+    // pronunciation / meaning choices
+    renderChoiceChips("pinyinChoices", t("af_multi_pinyin"), info.choices?.pinyin,
+      $("f_pinyin").value, v=>{ $("f_pinyin").value=v; autoFields.add("pinyin"); markSrc("pinyin"); });
+    const meanBox = [];
+    if(info.choices?.en) meanBox.push([t("af_en_alts"), info.choices.en, "en"]);
+    if(info.choices?.vi) meanBox.push([t("af_vi_alts"), info.choices.vi, "vi"]);
+    $("meaningChoices").innerHTML = "";
+    meanBox.forEach(([title,list,f])=>{
+      const div = document.createElement("div"); div.id = "mc_"+f; $("meaningChoices").appendChild(div);
+      renderChoiceChips("mc_"+f, title, [fieldEl(f).value, ...list.filter(x=>x!==fieldEl(f).value)],
+        fieldEl(f).value, v=>{ fieldEl(f).value=v; markSrc(f); });
+    });
+    // overwrite confirmations for manually-edited fields
+    if(pendingOverwrites.length){
+      const names = pendingOverwrites.map(p=>p.name).join(", ");
+      modal(t("af_overwrite_title"), `<p>${tf("af_overwrite_body",{f:esc(names)})}</p>`,
+        [{label:t("btn_keep_edits"),cls:"ghost"},
+         {label:t("btn_replace"),cls:"primary",cb:()=>{ pendingOverwrites.forEach(p=>{ editedFields.delete(p.name); setFieldAuto(p.name,p.value); }); pendingOverwrites=[]; checkSaveReady(); }}]);
+    }
+    const okMsg = info.fromCache ? t("af_cache_ok") : t("af_ok");
+    if(info.missing && info.missing.length){
+      afStatus(`<span style="color:var(--gold)">◐ ${okMsg} ${t("af_some_missing")}</span>`);
+      $("afWarn").innerHTML += `<div class="infobox">${t("af_missing_head")} <ul style="margin:.2rem 0 0 1.1rem">${info.missing.map(m=>`<li>${esc(t(m))}</li>`).join("")}</ul>${t("af_missing_tail")}</div>`;
+      $("afRetryBtn").style.display="";
+    } else afStatus(`<span style="color:var(--ok)">✓ ${okMsg} ${t("af_review_save")}</span>`);
+    sfx.click();
+  }catch(e){
+    if(e.name==="AbortError"){ /* user cancelled */ }
+    else{
+      afStatus(`<span style="color:var(--danger)">${t("af_failed")}</span>`);
+      $("afRetryBtn").style.display="";
+    }
+    afAbort = null;
+  }
+  $("autofillBtn").disabled=false; $("afCancelBtn").style.display="none";
+  checkSaveReady();
+}
+function clearAddForm(){
+  editingId = null; editedFields.clear(); autoFields.clear(); afLoadedFor="";
+  ["simp",...AF_FIELDS,"tags","note"].forEach(n=>{ const el=fieldEl(n); if(el) el.value=""; });
+  AF_FIELDS.forEach(markSrc);
+  $("pinyinChoices").innerHTML=""; $("meaningChoices").innerHTML=""; $("afWarn").innerHTML="";
+  afStatus(""); $("addTitle").innerHTML = t("add_title")+' <span class="zh hanzi">加词</span>';
+  $("afRetryBtn").style.display="none";
+  checkSaveReady();
+}
+function saveEntry(){
+  const simp = $("f_simp").value.trim();
+  if(!hanChars(simp).length){ toast(t("t_enter_chinese"),"err"); return; }
+  const dup = findBySimp(simp);
+  const doSave = ()=>{
+    const e = editingId ? state.entries[editingId] : newEntry({});
+    Object.assign(e, {
+      simp, trad:$("f_trad").value.trim(), pinyin:$("f_pinyin").value.trim(),
+      vi:$("f_vi").value.trim(), en:$("f_en").value.trim(), pos:$("f_pos").value.trim(),
+      hsk:$("f_hsk").value, strokes:$("f_strokes").value.trim(),
+      example:$("f_example").value.trim(), examplePinyin:$("f_examplePinyin").value.trim(),
+      exampleVi:$("f_exampleVi").value.trim(), exampleEn:$("f_exampleEn").value.trim(),
+      tags:$("f_tags").value.split(",").map(s=>s.trim()).filter(Boolean),
+      note:$("f_note").value.trim(), deck:$("f_deck").value||"General",
+      autoFields:[...autoFields], sample:false
+    });
+    if(!editingId){ state.entries[e.id]=e; state.order.push(e.id); }
+    save(); renderAll();
+    // Pre-cache stroke data for every character so practice works offline.
+    hanChars(simp).forEach(ch=> getCharData(ch).catch(()=>{}));
+    toast(editingId?t("t_updated"):t("t_saved"),"ok"); sfx.ok();
+    clearAddForm(); $("f_simp").focus();
+  };
+  if(dup && dup.id!==editingId)
+    confirmModal(t("dup_title"), tf("dup_body",{w:esc(simp)}), doSave, false);
+  else doSave();
+}
+function editEntry(id){
+  const e = state.entries[id]; if(!e) return;
+  closeModal(); clearAddForm();
+  editingId = id;
+  $("f_simp").value = e.simp;
+  AF_FIELDS.forEach(n=>{ fieldEl(n).value = e[n]||""; });
+  $("f_tags").value = (e.tags||[]).join(", "); $("f_note").value = e.note||"";
+  $("f_deck").value = e.deck;
+  (e.autoFields||[]).forEach(n=>autoFields.add(n)); AF_FIELDS.forEach(markSrc);
+  $("addTitle").innerHTML = `${t("edit_title")} <span class="zh hanzi">${esc(e.simp)}</span>`;
+  showView("add"); checkSaveReady();
+}
+
+/* ------------------------------ bulk add ------------------------------- */
+let bulkCancel=false;
+async function startBulk(){
+  const words = [...new Set($("bulkInput").value.split(/[\n,，;、\s]+/).map(w=>w.trim()).filter(w=>hanChars(w).length))];
+  if(!words.length){ toast(t("t_bulk_none"),"err"); return; }
+  bulkCancel=false;
+  $("bulkBtn").disabled=true; $("bulkCancelBtn").style.display="";
+  $("bulkProgressWrap").style.display=""; $("bulkFailed").innerHTML="";
+  const failed=[];
+  for(let i=0;i<words.length;i++){
+    if(bulkCancel) break;
+    const w = words[i];
+    $("bulkStatus").innerHTML = `${t("bulk_processing")} <b class="hanzi">${esc(w)}</b> (${i+1}/${words.length})…`;
+    $("bulkBar").style.width = Math.round(i/words.length*100)+"%";
+    if(findBySimp(w)){ $("bulkStatus").innerHTML += t("bulk_exists"); continue; }
+    try{
+      const info = await fetchWordInfo(w, undefined, false);
+      const e = newEntry({simp:w, deck:$("f_deck").value||"General",
+        autoFields:Object.keys(info.data), ...info.data});
+      state.entries[e.id]=e; state.order.push(e.id);
+      hanChars(w).forEach(ch=> getCharData(ch).catch(()=>{}));
+      if(info.missing?.length > 2) failed.push({w, reason:tf("bulk_partial",{n:info.missing.length})});
+    }catch(e){ failed.push({w, reason:t("bulk_failed")}); }
+    save();
+  }
+  $("bulkBar").style.width="100%";
+  $("bulkStatus").textContent = bulkCancel? t("bulk_stopped") : t("bulk_done");
+  $("bulkBtn").disabled=false; $("bulkCancelBtn").style.display="none";
+  if(failed.length){
+    $("bulkFailed").innerHTML = `<div class="warnbox mt">${t("bulk_attention")}</div>` + failed.map(f=>
+      `<div class="rowitem"><span class="hanzi">${esc(f.w)}</span><span class="small muted">${esc(f.reason)}</span>
+       <button class="btn sm" onclick="retryBulkItem('${esc(f.w)}',this)">${t("btn_retry")}</button></div>`).join("");
+  }
+  renderAll();
+}
+async function retryBulkItem(w, btn){
+  btn.disabled=true; btn.textContent="…";
+  try{
+    const info = await fetchWordInfo(w, undefined, true);
+    let e = findBySimp(w);
+    if(!e){ e = newEntry({simp:w}); state.entries[e.id]=e; state.order.push(e.id); }
+    for(const [k,v] of Object.entries(info.data)) if(v && !e[k]) e[k]=v;
+    e.autoFields = [...new Set([...(e.autoFields||[]), ...Object.keys(info.data)])];
+    save(); renderAll(); btn.textContent="✓"; sfx.ok();
+  }catch(err){ btn.textContent=t("btn_retry"); btn.disabled=false; toast(t("t_still_failing"),"err"); }
+}
+
+/* ===================== STROKE-ORDER RENDERER (SVG) =======================
+   Renders characters from hanzi-writer-data (1024x1024 grid, y-flipped) and
+   animates strokes by dash-animating the stroke median clipped to the
+   stroke outline. Supports play/pause/replay/prev/next stroke. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+class StrokeChar{
+  constructor(container, ch, sizePx, opts={}){
+    this.ch = ch; this.opts = opts;
+    this.svg = document.createElementNS(SVG_NS,"svg");
+    this.svg.setAttribute("viewBox","0 0 1024 1024");
+    this.svg.setAttribute("width",sizePx); this.svg.setAttribute("height",sizePx);
+    this.svg.classList.add("strokeSvg");
+    if(opts.grid) this.addGrid();
+    this.g = document.createElementNS(SVG_NS,"g");
+    this.g.setAttribute("transform","translate(0,900) scale(1,-1)");
+    this.svg.appendChild(this.g);
+    container.appendChild(this.svg);
+    this.shown = 0; this.playing = false; this.raf = null; this.data = null;
+    this.onDone = opts.onDone || null;
+  }
+  addGrid(){
+    const gr = document.createElementNS(SVG_NS,"g");
+    gr.setAttribute("stroke","var(--grid)"); gr.setAttribute("stroke-width","2");
+    gr.setAttribute("stroke-dasharray","10 10");
+    [["0","512","1024","512"],["512","0","512","1024"],["0","0","1024","1024"],["1024","0","0","1024"]].forEach(([x1,y1,x2,y2])=>{
+      const l = document.createElementNS(SVG_NS,"line");
+      l.setAttribute("x1",x1); l.setAttribute("y1",y1); l.setAttribute("x2",x2); l.setAttribute("y2",y2);
+      gr.appendChild(l);
+    });
+    const r = document.createElementNS(SVG_NS,"rect");
+    r.setAttribute("x","2"); r.setAttribute("y","2"); r.setAttribute("width","1020"); r.setAttribute("height","1020");
+    r.setAttribute("fill","none"); r.setAttribute("stroke","var(--grid)"); r.setAttribute("stroke-width","4"); r.setAttribute("stroke-dasharray","none");
+    gr.appendChild(r);
+    this.svg.appendChild(gr);
+  }
+  async load(){
+    this.data = await getCharData(this.ch);
+    return this;
+  }
+  clearG(){ this.g.innerHTML=""; this.stopAnim(); this.shown=0; }
+  /* faint full-character hint (used for tracing / outlines) */
+  showOutline(opacity=0.14, color="var(--ink)"){
+    if(!this.data) return;
+    this.data.strokes.forEach(d=>{
+      const p = document.createElementNS(SVG_NS,"path");
+      p.setAttribute("d",d); p.setAttribute("fill",color); p.setAttribute("opacity",opacity);
+      this.g.appendChild(p);
+    });
+  }
+  /* show first n strokes solid */
+  showUpTo(n, color="var(--ink)"){
+    for(let i=this.shown;i<Math.min(n,this.data.strokes.length);i++){
+      const p = document.createElementNS(SVG_NS,"path");
+      p.setAttribute("d",this.data.strokes[i]); p.setAttribute("fill",color);
+      p.dataset.stroke = i;
+      this.g.appendChild(p);
+    }
+    this.shown = Math.min(n, this.data.strokes.length);
+  }
+  showAll(color){ this.showUpTo(this.data.strokes.length, color); }
+  stopAnim(){ if(this.raf) cancelAnimationFrame(this.raf); this.raf=null; this.playing=false; this._cur=null; }
+  removeFrom(n){ // remove strokes >= n (for prev-stroke)
+    [...this.g.querySelectorAll("[data-stroke]")].forEach(p=>{ if(+p.dataset.stroke>=n) p.remove(); });
+    [...this.g.querySelectorAll("[data-anim]")].forEach(p=>p.remove());
+    this.shown = Math.min(this.shown, n);
+  }
+  medianLength(med){
+    let L=0; for(let i=1;i<med.length;i++){ const dx=med[i][0]-med[i-1][0], dy=med[i][1]-med[i-1][1]; L+=Math.hypot(dx,dy); }
+    return L;
+  }
+  /* animate stroke index i, then continue if playing */
+  animStroke(i){
+    if(!this.data || i>=this.data.strokes.length){ this.playing=false; this.onDone && this.onDone(); return; }
+    const d = this.data.strokes[i], med = this.data.medians[i];
+    const clipId = "c"+Math.random().toString(36).slice(2,8);
+    const clip = document.createElementNS(SVG_NS,"clipPath"); clip.setAttribute("id",clipId);
+    const cp = document.createElementNS(SVG_NS,"path"); cp.setAttribute("d",d); clip.appendChild(cp);
+    this.g.appendChild(clip);
+    const line = document.createElementNS(SVG_NS,"path");
+    line.setAttribute("d","M"+med.map(p=>p[0]+" "+p[1]).join(" L"));
+    const L = this.medianLength(med)+2;
+    line.setAttribute("fill","none"); line.setAttribute("stroke","var(--accent)");
+    line.setAttribute("stroke-width","220"); line.setAttribute("stroke-linecap","round");
+    line.setAttribute("clip-path",`url(#${clipId})`);
+    line.setAttribute("stroke-dasharray", L+" "+L); line.setAttribute("stroke-dashoffset", L);
+    line.dataset.anim = 1;
+    this.g.appendChild(line);
+    const dur = Math.max(260, L*0.9); // ms, proportional to stroke length
+    this._cur = {i, line, clip, L, t0:null, dur, progress:0};
+    const step = (ts)=>{
+      const c = this._cur; if(!c) return;
+      if(c.t0===null) c.t0 = ts - c.progress*c.dur;
+      const p = Math.min(1,(ts-c.t0)/c.dur); c.progress = p;
+      c.line.setAttribute("stroke-dashoffset", c.L*(1-p));
+      if(p>=1){
+        c.line.remove(); c.clip.remove(); this._cur=null;
+        this.showUpTo(i+1);
+        if(this.playing) this.raf = requestAnimationFrame(()=>this.animStroke(i+1));
+        else if(i+1>=this.data.strokes.length){ this.playing=false; this.onDone && this.onDone(); }
+        return;
+      }
+      if(this.playing) this.raf = requestAnimationFrame(step);
+    };
+    if(this.playing) this.raf = requestAnimationFrame(step);
+  }
+  play(){ // resume or start
+    if(!this.data || this.playing) return;
+    this.playing = true;
+    if(this._cur) this._resume();
+    else if(this.shown>=this.data.strokes.length) this.restart();
+    else this.animStroke(this.shown);
+  }
+  _resume(){ // helper to continue current stroke
+    const c = this._cur; if(!c) return;
+    const step = (ts)=>{
+      if(!this._cur) return;
+      if(c.t0===null) c.t0 = ts - c.progress*c.dur;
+      const p = Math.min(1,(ts-c.t0)/c.dur); c.progress=p;
+      c.line.setAttribute("stroke-dashoffset", c.L*(1-p));
+      if(p>=1){ c.line.remove(); c.clip.remove(); this._cur=null; this.showUpTo(c.i+1);
+        if(this.playing) this.raf=requestAnimationFrame(()=>this.animStroke(c.i+1)); return; }
+      if(this.playing) this.raf = requestAnimationFrame(step);
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+  pause(){ this.playing=false; if(this.raf) cancelAnimationFrame(this.raf); if(this._cur) this._cur.t0=null; }
+  restart(){ this.clearG(); if(this.opts.outline) this.showOutline(this.opts.outline); this.playing=true; this.animStroke(0); }
+  next(){ this.pause(); if(this._cur){ this._cur.line.remove(); this._cur.clip.remove(); const i=this._cur.i; this._cur=null; this.showUpTo(i+1); } else this.showUpTo(this.shown+1); }
+  prev(){ this.pause(); if(this._cur){ this._cur.line.remove(); this._cur.clip.remove(); this._cur=null; }
+    this.removeFrom(Math.max(0,this.shown-1)); }
+}
+/* Simplified play/pause toggle used by UI buttons */
+function scToggle(sc, btn){
+  if(sc.playing){ sc.pause(); btn.textContent=t("btn_play"); }
+  else{ sc.play(); btn.textContent=t("btn_pause"); }
+}
+
+/* ========================= HANDWRITING CANVAS ============================
+   Pointer-event canvas: works with mouse, touch, stylus and Apple Pencil.
+   Keeps a stroke list for Undo and stroke-count feedback. */
+class DrawCanvas{
+  constructor(box, opts={}){
+    this.box = box; this.opts = opts;
+    this.canvas = document.createElement("canvas");
+    box.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext("2d");
+    this.strokes = []; this.cur = null;
+    this.resize = this.resize.bind(this);
+    window.addEventListener("resize", this.resize);
+    requestAnimationFrame(this.resize);
+    this.canvas.addEventListener("pointerdown", e=>this.down(e));
+    this.canvas.addEventListener("pointermove", e=>this.move(e));
+    this.canvas.addEventListener("pointerup",   e=>this.up(e));
+    this.canvas.addEventListener("pointercancel", e=>this.up(e));
+    this.onStroke = opts.onStroke || null;
+  }
+  resize(){
+    const r = this.box.getBoundingClientRect();
+    if(!r.width) return;
+    const dpr = window.devicePixelRatio||1;
+    this.canvas.width = r.width*dpr; this.canvas.height = r.height*dpr;
+    this.ctx.setTransform(dpr,0,0,dpr,0,0);
+    this.w = r.width; this.h = r.height;
+    this.redraw();
+  }
+  pos(e){ const r = this.canvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+  down(e){
+    e.preventDefault(); this.canvas.setPointerCapture(e.pointerId);
+    this.cur = [this.pos(e)];
+  }
+  move(e){
+    if(!this.cur) return; e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    evs.forEach(ev=> this.cur.push(this.pos(ev)));
+    this.redraw();
+  }
+  up(e){
+    if(!this.cur) return;
+    if(this.cur.length>1){ this.strokes.push(this.cur); this.onStroke && this.onStroke(this.strokes.length); }
+    this.cur = null; this.redraw();
+  }
+  drawStroke(pts){
+    const c = this.ctx;
+    c.beginPath(); c.lineWidth = Math.max(4, this.w/38); c.lineCap="round"; c.lineJoin="round";
+    c.strokeStyle = getComputedStyle(document.body).getPropertyValue("--ink");
+    c.moveTo(pts[0][0], pts[0][1]);
+    for(let i=1;i<pts.length-1;i++){
+      const mx=(pts[i][0]+pts[i+1][0])/2, my=(pts[i][1]+pts[i+1][1])/2;
+      c.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+    }
+    const l=pts[pts.length-1]; c.lineTo(l[0],l[1]); c.stroke();
+  }
+  redraw(){
+    this.ctx.clearRect(0,0,this.w,this.h);
+    this.strokes.forEach(s=>this.drawStroke(s));
+    if(this.cur && this.cur.length>1) this.drawStroke(this.cur);
+  }
+  undo(){ this.strokes.pop(); this.redraw(); }
+  clear(){ this.strokes=[]; this.cur=null; this.redraw(); }
+  isEmpty(){ return !this.strokes.length; }
+  snapshot(size=140){
+    const c = document.createElement("canvas"); c.width=size; c.height=size;
+    const x = c.getContext("2d");
+    x.fillStyle = getComputedStyle(document.body).getPropertyValue("--canvas-bg");
+    x.fillRect(0,0,size,size);
+    x.drawImage(this.canvas, 0,0, this.canvas.width, this.canvas.height, 0,0,size,size);
+    return c.toDataURL();
+  }
+  destroy(){ window.removeEventListener("resize", this.resize); }
+}
+/* grid underlay (米字格) drawn as SVG inside the canvas box */
+function gridUnderlay(box){
+  const s = document.createElementNS(SVG_NS,"svg");
+  s.setAttribute("viewBox","0 0 100 100"); s.setAttribute("preserveAspectRatio","none");
+  s.classList.add("underlay");
+  s.innerHTML = `<g stroke="var(--grid)" stroke-width="0.6" stroke-dasharray="2.5 2.5">
+    <line x1="50" y1="0" x2="50" y2="100"/><line x1="0" y1="50" x2="100" y2="50"/>
+    <line x1="0" y1="0" x2="100" y2="100"/><line x1="100" y1="0" x2="0" y2="100"/></g>`;
+  box.appendChild(s); return s;
+}
+
+/* ========================== SPACED REPETITION ============================
+   Intervals (days): forgot -> ~10 min & requeued now; incorrect -> 1;
+   almost -> 2; correct-difficult -> 4; correct-easy -> 7;
+   repeated successes climb the ladder 14 / 30 / 60 / 120.
+   Hints halve the next interval. A lapsed mastered word drops to 1 day. */
+const RATINGS = {
+  forgot:   {label:"Forgot completely", key:"1", cls:"r1"},
+  incorrect:{label:"Incorrect",         key:"2", cls:"r2"},
+  almost:   {label:"Almost correct",    key:"3", cls:"r3"},
+  hard:     {label:"Correct, difficult",key:"4", cls:"r4"},
+  easy:     {label:"Correct and easy",  key:"5", cls:"r5"}
+};
+function srsRate(e, rating, hintsUsed){
+  const s = e.srs, LADDER = [4,7,14,30,60,120];
+  s.attempts++;
+  if(hintsUsed) s.hints++;
+  const success = rating==="easy" || rating==="hard";
+  if(success){ s.correct++; s.streak++; }
+  else{ if(s.interval>=30) s.lapses++; s.streak=0; }
+  let days;
+  if(rating==="forgot") days = 10/1440;              // ~10 minutes
+  else if(rating==="incorrect") days = 1;
+  else if(rating==="almost") days = 2;
+  else if(s.streak>=2 && s.interval>0){
+    days = LADDER.find(v=>v>s.interval) ?? 120;      // climb the ladder
+    if(rating==="hard") days = Math.max(4, Math.round(days*0.6));
+  } else days = rating==="easy" ? 7 : 4;
+  if(hintsUsed && success) days = Math.max(1, days*0.5);   // hints reduce mastery
+  if(rating==="incorrect" || rating==="almost"){ if(s.interval>=30) days = 1; } // mastered lapse shortens
+  s.interval = days;
+  s.history.push({t:now(), rating, hints:hintsUsed?1:0});
+  if(s.history.length>60) s.history.shift();
+  e.lastReview = now();
+  e.nextReview = now() + days*DAY;
+}
+
+/* ============================ PRACTICE ENGINE ============================ */
+let sess = null;      // active session (serializable, persisted for Resume)
+let ui = null;        // per-item runtime state (canvas, stroke chars…)
+function promptFor(e, mode){
+  const opts = [["pinyin",e.pinyin], ["vi",e.vi], ["en",e.en]].filter(o=>o[1]);
+  if(!opts.length) return "pinyin";
+  if(mode==="mix") return opts[Math.floor(Math.random()*opts.length)][0];
+  return opts.find(o=>o[0]===mode) ? mode : opts[0][0];
+}
+function buildPool(deck, pool){
+  let list = allEntries(deck||null).filter(e=>e.pinyin||e.vi||e.en);
+  const due = list.filter(isDue).sort((a,b)=>a.nextReview-b.nextReview);
+  const weak = list.filter(e=>isWeak(e)&&!isDue(e));
+  const news = list.filter(isNew);
+  const rest = list.filter(e=>!isDue(e)&&!isWeak(e)&&!isNew(e));
+  if(pool==="due") return [...due];
+  if(pool==="new") return [...news];
+  if(pool==="weak") return list.filter(isWeak);
+  return [...due, ...weak, ...news, ...rest]; // "all": prioritise overdue & weak
+}
+function startSession(){
+  const deck = $("p_deck").value, pool = $("p_pool").value;
+  const count = +$("p_count").value, prompt = $("p_prompt").value;
+  const mode = document.querySelector("#p_modeChips .sel")?.dataset.m || "recall";
+  const cands = buildPool(deck, pool).slice(0, count);
+  if(!cands.length){ toast(t("t_no_matching"),"err"); return; }
+  const queue = [];
+  cands.forEach(e=>{
+    if(mode==="guided" || (mode==="mixed" && isNew(e))) queue.push({eid:e.id, kind:"guided"});
+    if(mode!=="guided") queue.push({eid:e.id, kind:"recall", prompt:promptFor(e,prompt)});
+  });
+  sess = { id:uid(), startedAt:now(), elapsed:0,
+    config:{deck,pool,count,prompt,mode},
+    queue, idx:0, results:{}, chars:0 };
+  persistSession();
+  $("practiceSetup").style.display="none"; $("practiceResults").style.display="none";
+  $("practiceSession").style.display="";
+  renderItem();
+}
+function persistSession(){ state.activeSession = sess ? JSON.parse(JSON.stringify(sess)) : null; save(); }
+function resumeSession(){
+  if(!state.activeSession){ toast(t("t_no_resume")); return; }
+  sess = JSON.parse(JSON.stringify(state.activeSession));
+  sess.startedAt = now(); // elapsed keeps prior time
+  showView("practice");
+  $("practiceSetup").style.display="none"; $("practiceResults").style.display="none";
+  $("practiceSession").style.display="";
+  renderItem();
+}
+function discardSession(){ state.activeSession=null; sess=null; save(); renderPracticeSetup(); }
+function exitSession(){
+  if(!sess) return;
+  sess.elapsed += now()-sess.startedAt;
+  persistSession();
+  cleanupItem();
+  sess=null;
+  $("practiceSession").style.display="none";
+  renderPracticeSetup();
+  toast(t("t_paused"));
+}
+function cleanupItem(){
+  if(ui){ ui.canvas?.destroy?.(); ui.strokeChars?.forEach(sc=>sc.stopAnim()); }
+  ui = null;
+}
+function resFor(eid){
+  return sess.results[eid] = sess.results[eid] || {attempts:0, hints:0, ratings:[], guided:false};
+}
+/* requeue a failed item a few positions later (never immediately next
+   when other items remain) */
+function requeue(item){
+  // insert a few positions later; falls back to the end of the queue
+  const insert = Math.min(sess.queue.length, sess.idx + 4);
+  sess.queue.splice(insert, 0, {...item, requeued:true});
+}
+function advance(){
+  cleanupItem();
+  sess.idx++;
+  persistSession();
+  if(sess.idx >= sess.queue.length) finishSession();
+  else renderItem();
+}
+/* apply a self-assessment rating to the current item */
+function applyRating(rating){
+  const item = sess.queue[sess.idx];
+  const e = state.entries[item.eid];
+  if(!e){ advance(); return; }
+  const r = resFor(item.eid);
+  const hinted = (ui?.hintLevel||0) > 0;
+  r.attempts++; if(hinted) r.hints++;
+  r.ratings.push(rating);
+  if(item.kind==="guided") r.guided = true;
+  srsRate(e, rating, hinted);
+  if(rating==="forgot" || rating==="incorrect" || rating==="almost"){
+    requeue({eid:item.eid, kind:"recall", prompt:item.prompt||promptFor(e, sess.config.prompt)});
+    sfx.bad();
+  } else sfx.ok();
+  save();
+  advance();
+}
+
+/* --------------------------- item rendering ----------------------------- */
+function sessProgress(){
+  const pct = Math.round(sess.idx / sess.queue.length * 100);
+  $("sessBar").style.width = pct+"%";
+  $("sessCount").textContent = (sess.idx+1)+" / "+sess.queue.length;
+}
+function entryInfoHTML(e, full=true, hideChar=false){
+  return `<div class="center">
+    ${hideChar?"":`<div class="hanzi charbig">${esc(e.simp)}</div>`}
+    ${!hideChar && e.trad && e.trad!==e.simp?`<div class="muted small hanzi">${t("ei_trad")} ${esc(e.trad)}</div>`:""}
+    <div class="prompt-main">${esc(e.pinyin)}</div>
+    <div>🇻🇳 ${esc(e.vi)||"—"} &nbsp;·&nbsp; 🇬🇧 ${esc(e.en)||"—"}</div>
+    ${e.pos?`<div class="muted small">${esc(e.pos)}${e.hsk?` · HSK ${esc(e.hsk)}`:""}${e.strokes?` · ${esc(e.strokes)} ${t("ei_strokes")}`:""}</div>`:
+      (e.strokes?`<div class="muted small">${esc(e.strokes)} ${t("ei_strokes")}${e.hsk?` · HSK ${esc(e.hsk)}`:""}</div>`:"")}
+    ${full && !hideChar && e.example?`<div class="mt small"><span class="hanzi" style="font-size:1.1rem">${esc(e.example)}</span><br>
+      <span class="muted">${esc(e.examplePinyin)}</span><br>🇻🇳 ${esc(e.exampleVi)} · 🇬🇧 ${esc(e.exampleEn)}</div>`:""}
+    <div class="btnrow mt" style="justify-content:center">
+      <button class="btn sm" onclick="speak('${esc(e.simp)}')">${t("btn_word_audio")}</button>
+      ${e.example && !hideChar?`<button class="btn sm" onclick="speak('${esc(e.example)}')">${t("btn_example_audio")}</button>`:""}
+    </div></div>`;
+}
+function renderItem(){
+  cleanupItem();
+  sessProgress();
+  const item = sess.queue[sess.idx];
+  const e = state.entries[item.eid];
+  if(!e){ advance(); return; }
+  ui = {hintLevel:0, strokeChars:[], canvas:null};
+  if(item.kind==="guided") renderGuided(item, e);
+  else renderRecall(item, e);
+}
+
+/* ---- GUIDED LEARNING: watch → trace → faint trace → memory → word ------ */
+function guidedSteps(e){
+  const chars = hanChars(e.simp);
+  const steps = [];
+  chars.forEach((c,i)=>{
+    steps.push({t:"watch",c,i}, {t:"trace",c,i,op:.3,label:"g_trace_strong"},
+               {t:"trace",c,i,op:.1,label:"g_trace_faint"}, {t:"trace",c,i,op:0,label:"g_memory"});
+  });
+  if(chars.length>1) steps.push({t:"word"});
+  steps.push({t:"rate"});
+  return steps;
+}
+function renderGuided(item, e){
+  item.step = item.step||0;
+  const steps = guidedSteps(e);
+  if(item.step>=steps.length) item.step = steps.length-1;
+  const st = steps[item.step];
+  const hide = (st.t==="trace" && st.op===0) || st.t==="word"; // memory steps: don't show the answer
+  const dots = steps.map((_,i)=>`<span class="${i<=item.step?'on':''}"></span>`).join("");
+  let body = "";
+  if(st.t==="watch"){
+    body = `<h3 class="center">${tf("g_watch",{i:st.i+1, n:hanChars(e.simp).length})} <span class="hanzi" style="font-size:1.5rem">${esc(st.c)}</span></h3>
+      <div class="center" id="animBox" style="min-height:120px"></div>
+      <div class="btnrow mt" style="justify-content:center">
+        <button class="btn" id="playBtn">${t("btn_pause")}</button>
+        <button class="btn" id="replayBtn">${t("btn_replay")}</button>
+        <button class="btn" id="prevBtn">${t("btn_prev_stroke")}</button>
+        <button class="btn" id="nextBtn">${t("btn_next_stroke")}</button>
+      </div>
+      <div class="btnrow mt" style="justify-content:center"><button class="btn primary" onclick="guidedNext()">${t("btn_start_trace")}</button></div>`;
+  }else if(st.t==="trace"){
+    body = `<h3 class="center">${t(st.label)}${hide?"":` — <span class="hanzi" style="font-size:1.4rem">${esc(st.c)}</span>`}</h3>
+      <div class="canvasbox" id="cbox"></div>
+      <div class="btnrow mt" style="justify-content:center">
+        <button class="btn" onclick="ui.canvas.undo()">${t("btn_undo")}</button>
+        <button class="btn" onclick="ui.canvas.clear()">${t("btn_clear")}</button>
+        <button class="btn" onclick="guidedReplayAnim()">${t("btn_stroke_order")}</button>
+        <button class="btn primary" onclick="guidedNext()">${t("btn_next_step")}</button>
+      </div>`;
+  }else if(st.t==="word"){
+    body = `<h3 class="center">${t("g_word")} <span class="muted">${esc(e.pinyin)}</span></h3>
+      <div class="canvasbox wide" id="cbox" style="aspect-ratio:${Math.max(2,hanChars(e.simp).length)} / 1"></div>
+      <div class="btnrow mt" style="justify-content:center">
+        <button class="btn" onclick="ui.canvas.undo()">${t("btn_undo")}</button>
+        <button class="btn" onclick="ui.canvas.clear()">${t("btn_clear")}</button>
+        <button class="btn primary" onclick="guidedNext()">${t("btn_done")}</button>
+      </div>`;
+  }else{ // rate
+    body = `<h3 class="center">${t("g_rate_q")}</h3>
+      <div class="center muted small">${t("g_rate_note")}</div>
+      ${ratingButtonsHTML()}`;
+  }
+  $("sessArea").innerHTML = `<div class="card">${entryInfoHTML(e, st.t!=="rate" && !hide, hide)}</div>
+    <div class="card"><div class="stepdots">${dots}</div>${body}</div>`;
+  if(st.t==="watch") mountAnimation(st.c);
+  if(st.t==="trace") mountTraceCanvas(st.c, st.op);
+  if(st.t==="word") mountCanvas(true);
+  bindRatingButtons();
+}
+function guidedNext(){
+  const item = sess.queue[sess.idx];
+  if(ui?.canvas && !ui.canvas.isEmpty()){ sess.chars++; state.stats.charsWritten++; }
+  item.step = (item.step||0)+1;
+  persistSession();
+  renderItem();
+}
+function guidedReplayAnim(){
+  const item = sess.queue[sess.idx];
+  const e = state.entries[item.eid];
+  const st = guidedSteps(e)[item.step];
+  modal(t("g_anim_title")+" "+st.c, `<div class="center" id="modalAnim"></div>`, [{label:t("btn_close"),cls:"ghost"}]);
+  const sc = new StrokeChar($("modalAnim"), st.c, 220, {grid:true});
+  sc.load().then(()=>{ sc.playing=true; sc.animStroke(0); })
+    .catch(()=> $("modalAnim").innerHTML = `<div class="hanzi charbig">${esc(st.c)}</div><p class="muted small">${t("g_data_unavail")}</p>`);
+}
+function mountAnimation(ch){
+  const box = $("animBox");
+  const size = Math.min(300, Math.round(260*state.settings.charScale));
+  const sc = new StrokeChar(box, ch, size, {grid:true});
+  ui.strokeChars.push(sc);
+  sc.load().then(()=>{ sc.playing = true; sc.animStroke(0); })
+    .catch(()=>{
+      box.innerHTML = `<div class="hanzi charbig">${esc(ch)}</div><div class="muted small">${t("g_anim_unavail")}</div>`;
+      ["playBtn","replayBtn","prevBtn","nextBtn"].forEach(id=>$(id)&&($(id).disabled=true));
+    });
+  $("playBtn").onclick = ()=>scToggle(sc, $("playBtn"));
+  $("replayBtn").onclick = ()=>{ sc.restart(); $("playBtn").textContent=t("btn_pause"); };
+  $("prevBtn").onclick = ()=>{ sc.prev(); $("playBtn").textContent=t("btn_play"); };
+  $("nextBtn").onclick = ()=>{ sc.next(); $("playBtn").textContent=t("btn_play"); };
+}
+function mountCanvas(wide){
+  const box = $("cbox");
+  gridUnderlay(box);
+  ui.canvas = new DrawCanvas(box, {});
+}
+/* trace canvas with a hint outline underneath (SVG strokes if cached,
+   otherwise a faint font rendering of the character) */
+function mountTraceCanvas(ch, opacity){
+  const box = $("cbox");
+  gridUnderlay(box);
+  if(opacity>0){
+    const und = document.createElement("div");
+    und.className="underlay"; und.style.display="flex"; und.style.alignItems="center"; und.style.justifyContent="center";
+    box.appendChild(und);
+    getCharData(ch).then(()=>{
+      const sc = new StrokeChar(und, ch, box.clientWidth||300, {});
+      ui.strokeChars.push(sc);
+      sc.load().then(()=>sc.showOutline(opacity));
+    }).catch(()=>{
+      und.innerHTML = `<span class="hanzi" style="font-size:${Math.round((box.clientWidth||300)*0.8)}px; opacity:${opacity}; line-height:1">${esc(ch)}</span>`;
+    });
+  }
+  ui.canvas = new DrawCanvas(box, {});
+}
+
+/* ------------------- RECALL PRACTICE (nothing shown) -------------------- */
+const PROMPT_LABEL = {pinyin:"pl_pinyin", vi:"pl_vi", en:"pl_en"};
+function renderRecall(item, e){
+  const pv = {pinyin:e.pinyin, vi:e.vi, en:e.en}[item.prompt] || e.pinyin;
+  const chars = hanChars(e.simp);
+  const wide = chars.length>1;
+  $("sessArea").innerHTML = `
+    <div class="card prompt-card">
+      <div class="prompt-sub">${t(PROMPT_LABEL[item.prompt]||"pl_pinyin")}${item.requeued?` · <span style="color:var(--gold)">${t("retry")}</span>`:''}</div>
+      <div class="prompt-main">${esc(pv)}</div>
+      <div class="hintline" id="hintLine"></div>
+    </div>
+    <div class="card">
+      <div class="canvasbox ${wide?'wide':''}" id="cbox" ${wide?`style="aspect-ratio:${chars.length} / 1"`:""}></div>
+      <div class="btnrow mt" style="justify-content:center">
+        <button class="btn" onclick="ui.canvas.undo()">${t("btn_undo")} <kbd>U</kbd></button>
+        <button class="btn" onclick="ui.canvas.clear()">${t("btn_clear")} <kbd>C</kbd></button>
+        <button class="btn" id="hintBtn" onclick="giveHint()">${t("btn_hint")} <kbd>H</kbd></button>
+        <button class="btn" onclick="recallForgot()">${t("btn_forgot")}</button>
+        <button class="btn primary" onclick="submitRecall()">${t("btn_submit")} <kbd>⏎</kbd></button>
+      </div>
+    </div>`;
+  mountCanvas(wide);
+}
+/* progressive hints: 1 char count · 2 stroke count · 3 first stroke ·
+   4 faint outline · 5 full answer */
+function giveHint(){
+  const item = sess.queue[sess.idx];
+  const e = state.entries[item.eid];
+  const chars = hanChars(e.simp);
+  ui.hintLevel = Math.min(5, (ui.hintLevel||0)+1);
+  const hl = $("hintLine");
+  sfx.click();
+  if(ui.hintLevel===1) hl.textContent = tf("hint1",{n:chars.length});
+  else if(ui.hintLevel===2) hl.textContent = tf("hint2",{s:e.strokes || t("hint2_none")});
+  else if(ui.hintLevel===3){
+    hl.textContent = t("hint3");
+    overlayHint(chars, "first");
+  }else if(ui.hintLevel===4){
+    hl.textContent = t("hint4");
+    overlayHint(chars, "outline");
+  }else{
+    hl.textContent = t("hint5");
+    revealRecall(true);
+  }
+}
+function overlayHint(chars, kind){
+  const box = $("cbox");
+  box.querySelectorAll(".hintlayer").forEach(x=>x.remove());
+  const und = document.createElement("div");
+  und.className = "underlay hintlayer";
+  und.style.display="flex"; und.style.alignItems="center"; und.style.justifyContent="center";
+  box.appendChild(und);
+  const size = Math.min(box.clientWidth/chars.length, box.clientHeight)||200;
+  chars.forEach((ch,i)=>{
+    const cell = document.createElement("div");
+    und.appendChild(cell);
+    getCharData(ch).then(()=>{
+      const sc = new StrokeChar(cell, ch, size, {});
+      ui.strokeChars.push(sc);
+      sc.load().then(()=>{
+        if(kind==="outline") sc.showOutline(0.12);
+        else if(i===0){ sc.showOutline(0.05); sc.showUpTo(1,"var(--accent)"); }
+      });
+    }).catch(()=>{
+      if(kind==="outline") cell.innerHTML = `<span class="hanzi" style="font-size:${size*0.8}px; opacity:.12; line-height:1">${esc(ch)}</span>`;
+      else if(i===0) $("hintLine").textContent = t("hint3_unavail");
+    });
+  });
+}
+function recallForgot(){
+  ui.hintLevel = 5;
+  revealRecall(false, true);
+}
+function submitRecall(){
+  if(ui.canvas.isEmpty()){ toast(t("t_write_first"),"err"); return; }
+  revealRecall(false);
+}
+/* reveal answer + stroke animation + self-assessment */
+function revealRecall(fromHint, forgot=false){
+  const item = sess.queue[sess.idx];
+  const e = state.entries[item.eid];
+  const chars = hanChars(e.simp);
+  const snap = ui.canvas && !ui.canvas.isEmpty() ? ui.canvas.snapshot(150) : null;
+  const drawn = ui.canvas ? ui.canvas.strokes.length : 0;
+  if(snap) sess.chars += chars.length;
+  state.stats.charsWritten += (snap? chars.length : 0);
+  const expected = e.strokes ? parseInt(String(e.strokes).split("=").pop()) : null;
+  let strokeNote = "";
+  if(snap && expected) strokeNote = drawn===expected
+    ? `<span style="color:var(--ok)">${tf("rv_stroke_match",{d:drawn, e:expected})}</span>`
+    : `<span style="color:var(--gold)">${tf("rv_stroke_diff",{d:drawn, w:esc(e.simp), e:expected})}</span>`;
+  const capNote = ui.hintLevel>0 ? `<div class="small muted center mt">${tf("rv_hints_used",{n:ui.hintLevel})}</div>` : "";
+  $("sessArea").innerHTML = `
+    <div class="card">
+      <h3 class="center">${forgot? t("rv_study") : t("rv_compare")}</h3>
+      <div class="answer-side">
+        ${snap?`<div class="col"><div class="cap">${t("rv_yours")}</div><img class="snapshot" src="${snap}" width="150" height="150" alt=""></div>`:""}
+        <div class="col"><div class="cap">${t("rv_correct")}</div><div id="revealAnim" style="display:flex; gap:.4rem; justify-content:center"></div></div>
+      </div>
+      <div class="center small mt">${strokeNote}</div>
+      ${entryInfoHTML(e)}
+      ${capNote}
+      <div class="center small muted mt">${t("rv_honest")}</div>
+      ${ratingButtonsHTML(forgot)}
+    </div>`;
+  // animate each character of the answer
+  chars.forEach(ch=>{
+    const cell = document.createElement("div");
+    $("revealAnim").appendChild(cell);
+    const size = Math.min(150, Math.round(340/chars.length));
+    const sc = new StrokeChar(cell, ch, size, {grid:true});
+    ui.strokeChars.push(sc);
+    sc.load().then(()=>{ sc.playing=true; sc.animStroke(0); })
+      .catch(()=> cell.innerHTML = `<span class="hanzi" style="font-size:${size*0.75}px">${esc(ch)}</span>`);
+  });
+  speak(e.simp);
+  bindRatingButtons();
+}
+function ratingButtonsHTML(forgotOnly=false){
+  const hinted = ui?.hintLevel||0;
+  if(forgotOnly)
+    return `<div class="btnrow mt" style="justify-content:center">
+      <button class="btn primary" onclick="applyRating('forgot')">${t("btn_continue_soon")}</button></div>`;
+  const order = ["forgot","incorrect","almost","hard","easy"];
+  return `<div class="ratebtns">`+order.map((k,i)=>{
+    // hints cap the best available rating: outline/full hints -> "almost" max
+    const disabled = (hinted>=4 && (k==="hard"||k==="easy")) || (hinted>0 && hinted<4 && k==="easy");
+    return `<button class="${RATINGS[k].cls}" ${disabled?`disabled title="${t("no_hint_after")}"`:""} data-rate="${k}">
+      ${i+1}. ${t("r_"+k)}<small>${t("ri_"+k)}</small></button>`;
+  }).join("")+`</div>`;
+}
+function bindRatingButtons(){
+  document.querySelectorAll("[data-rate]").forEach(b=> b.onclick = ()=>applyRating(b.dataset.rate));
+}
+
+/* ============================ SESSION RESULTS ============================ */
+function finishSession(){
+  cleanupItem();
+  const dur = (sess.elapsed||0) + (now()-sess.startedAt);
+  const entriesSeen = Object.keys(sess.results);
+  let correct=0, incorrect=0, noHint=0, withHint=0, forgot=0, totalRatings=0, hintsTotal=0;
+  const rows = entriesSeen.map(eid=>{
+    const e = state.entries[eid]; const r = sess.results[eid];
+    if(!e) return "";
+    const final = r.ratings[r.ratings.length-1];
+    const success = final==="easy"||final==="hard";
+    r.ratings.forEach(x=>{ totalRatings++; if(x==="easy"||x==="hard") correct++; else if(x==="forgot") forgot++; else incorrect++; });
+    hintsTotal += r.hints;
+    if(success && r.hints===0) noHint++; else if(success) withHint++;
+    return `<tr><td><span class="hanzi">${esc(e.simp)}</span><br><span class="small muted">${esc(e.pinyin)}</span></td>
+      <td>${r.attempts}</td><td>${r.hints}</td>
+      <td>${RATINGS[final]?t("r_"+final):"—"}</td>
+      <td>${statusBadge(entryStatus(e))}</td>
+      <td class="small">${fmtDue(e.nextReview)}</td></tr>`;
+  }).join("");
+  const acc = totalRatings? Math.round(correct/totalRatings*100) : 0;
+  const stat = {Strong:0, Mastered:0, Developing:0, Weak:0, Learning:0, New:0};
+  entriesSeen.forEach(eid=>{ const e=state.entries[eid]; if(e) stat[entryStatus(e)]++; });
+  state.sessions.push({date:now(), total:entriesSeen.length, ratings:totalRatings, correct, acc, durationMs:dur, chars:sess.chars});
+  if(state.sessions.length>200) state.sessions.shift();
+  state.activeSession = null;
+  const mins = Math.max(1, Math.round(dur/60000));
+  $("practiceSession").style.display="none";
+  $("practiceResults").style.display="";
+  $("practiceResults").innerHTML = `
+    <div class="card center">
+      <h3>${t("res_done")}</h3>
+      <div class="statgrid mt">
+        <div class="stat"><div class="n">${entriesSeen.length}</div><div class="l">${t("res_words")}</div></div>
+        <div class="stat"><div class="n">${acc}%</div><div class="l">${t("res_acc")}</div></div>
+        <div class="stat"><div class="n">${correct} / ${totalRatings}</div><div class="l">${t("res_correct")}</div></div>
+        <div class="stat"><div class="n">${forgot}</div><div class="l">${t("res_forgot")}</div></div>
+        <div class="stat"><div class="n">${noHint}</div><div class="l">${t("res_nohint")}</div></div>
+        <div class="stat"><div class="n">${withHint}</div><div class="l">${t("res_withhint")}</div></div>
+        <div class="stat"><div class="n">${mins} ${t("lbl_min")}</div><div class="l">${t("res_time")}</div></div>
+        <div class="stat"><div class="n">${sess.chars}</div><div class="l">${t("res_chars")}</div></div>
+      </div>
+      <div class="btnrow mt" style="justify-content:center">
+        ${["Mastered","Strong","Developing","Weak","Learning","New"].filter(k=>stat[k]).map(k=>`<span class="badge b-${k.toLowerCase()}">${t("st_"+k)}: ${stat[k]}</span>`).join(" ")}
+      </div>
+    </div>
+    <div class="card tablewrap">
+      <h3>${t("res_detail")}</h3>
+      <table><thead><tr><th>${t("th_word")}</th><th>${t("th_attempts")}</th><th>${t("th_hints")}</th><th>${t("th_last_rating")}</th><th>${t("th_status")}</th><th>${t("th_next")}</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+    <div class="card"><div class="btnrow">
+      <button class="btn primary" onclick="renderPracticeSetup(); $('practiceResults').style.display='none'">${t("btn_again")}</button>
+      <button class="btn" onclick="showView('dashboard')">${t("btn_view_dash")}</button>
+    </div></div>`;
+  sess = null;
+  save(); renderAll();
+  sfx.ok();
+}
+
+/* ======================== PRACTICE SETUP & REVIEW ======================= */
+function renderPracticeSetup(){
+  $("practiceSetup").style.display="";
+  $("practiceSession").style.display="none";
+  const deck = $("p_deck").value || null;
+  const list = allEntries(deck);
+  const stats = {
+    due: list.filter(isDue).length, new: list.filter(isNew).length,
+    weak: list.filter(isWeak).length,
+    mastered: list.filter(e=>entryStatus(e)==="Mastered").length, all: list.length
+  };
+  $("poolStats").innerHTML = `
+    <div class="stat"><div class="n">${stats.due}</div><div class="l">${t("lbl_due_now")}</div></div>
+    <div class="stat"><div class="n">${stats.new}</div><div class="l">${t("lbl_new")}</div></div>
+    <div class="stat"><div class="n">${stats.weak}</div><div class="l">${t("lbl_weak")}</div></div>
+    <div class="stat"><div class="n">${stats.mastered}</div><div class="l">${t("lbl_mastered")}</div></div>
+    <div class="stat"><div class="n">${stats.all}</div><div class="l">${t("lbl_total")}</div></div>`;
+  $("resumeCard").style.display = state.activeSession ? "" : "none";
+  $("dashResumeBtn").style.display = state.activeSession ? "" : "none";
+}
+function practiceDueNow(){
+  showView("practice");
+  $("p_pool").value="due";
+  startSession();
+}
+function renderReview(){
+  const due = allEntries().filter(isDue).sort((a,b)=>a.nextReview-b.nextReview);
+  const soon = allEntries().filter(e=>e.nextReview && !isDue(e)).sort((a,b)=>a.nextReview-b.nextReview).slice(0,15);
+  $("reviewCount").textContent = tf("rev_count",{d:due.length, s:soon.length});
+  const row = (e,dueNow)=>`<tr>
+    <td><span class="hanzi">${esc(e.simp)}</span></td><td>${esc(e.pinyin)}</td>
+    <td class="small">🇻🇳 ${esc(e.vi)}<br>🇬🇧 ${esc(e.en)}</td>
+    <td>${statusBadge(entryStatus(e))}</td>
+    <td class="small" style="color:${dueNow?'var(--danger)':'var(--muted)'}">${fmtDue(e.nextReview)}</td>
+    <td class="small">${e.srs.attempts} (${e.srs.correct} ✓)</td></tr>`;
+  $("reviewBody").innerHTML =
+    due.map(e=>row(e,true)).join("") +
+    (soon.length?`<tr><td colspan="6" class="muted small">${t("upcoming_sep")}</td></tr>`+soon.map(e=>row(e,false)).join(""):"") ||
+    `<tr><td colspan="6" class="center muted">${t("rev_empty")}</td></tr>`;
+}
+
+/* ============================== DASHBOARD =============================== */
+function studyStreak(){
+  const days = new Set(state.sessions.map(s=> new Date(s.date).toDateString()));
+  let streak=0; const d = new Date();
+  while(days.has(d.toDateString())){ streak++; d.setDate(d.getDate()-1); }
+  if(!streak && days.has(new Date(Date.now()-DAY).toDateString())){ // studied yesterday, today still possible
+    const d2 = new Date(Date.now()-DAY);
+    while(days.has(d2.toDateString())){ streak++; d2.setDate(d2.getDate()-1); }
+  }
+  return streak;
+}
+function renderDashboard(){
+  const list = allEntries();
+  const due = list.filter(isDue).length;
+  const counts = {New:0,Learning:0,Weak:0,Developing:0,Strong:0,Mastered:0};
+  list.forEach(e=>counts[entryStatus(e)]++);
+  $("dashStats").innerHTML = `
+    <div class="stat"><div class="n">${list.length}</div><div class="l">${t("lbl_total_words")}</div></div>
+    <div class="stat"><div class="n">${due}</div><div class="l">${t("lbl_due_today")}</div></div>
+    <div class="stat"><div class="n">${counts.New}</div><div class="l">${t("lbl_new")}</div></div>
+    <div class="stat"><div class="n">${counts.Weak}</div><div class="l">${t("lbl_weak")}</div></div>
+    <div class="stat"><div class="n">${counts.Mastered}</div><div class="l">${t("lbl_mastered")}</div></div>
+    <div class="stat"><div class="n">${studyStreak()}🔥</div><div class="l">${t("lbl_streak")}</div></div>
+    <div class="stat"><div class="n">${state.sessions.length}</div><div class="l">${t("lbl_sessions")}</div></div>
+    <div class="stat"><div class="n">${state.stats.charsWritten}</div><div class="l">${t("lbl_chars")}</div></div>`;
+  // status bars
+  const max = Math.max(1,...Object.values(counts));
+  $("dashStatus").innerHTML = Object.entries(counts).map(([k,v])=>`
+    <div class="rowitem"><span style="min-width:6.5rem">${statusBadge(k)}</span>
+    <div class="bar" style="flex:1; align-self:center"><div style="width:${v/max*100}%"></div></div>
+    <span style="min-width:2.2rem; text-align:right">${v}</span></div>`).join("");
+  // upcoming reviews, next 7 days
+  const byDay = Array(7).fill(0);
+  list.forEach(e=>{
+    if(!e.nextReview) return;
+    const d = Math.floor((e.nextReview - new Date().setHours(0,0,0,0))/DAY);
+    if(d>=0 && d<7) byDay[d]++;
+    else if(d<0) byDay[0]++;
+  });
+  const um = Math.max(1,...byDay);
+  $("dashUpcoming").innerHTML = byDay.map(v=>`<div class="cb" style="height:${Math.max(4,v/um*100)}%"><span>${v||""}</span></div>`).join("");
+  $("dashUpcomingLbl").innerHTML = byDay.map((_,i)=>`<div>${i===0?t("today"):"+"+i+"d"}</div>`).join("");
+  // accuracy over sessions
+  const recent = state.sessions.slice(-14);
+  $("dashAcc").innerHTML = recent.map(s=>`<div class="cb acc" style="height:${Math.max(4,s.acc)}%"><span>${s.acc}%</span></div>`).join("") || `<div class="muted small">${t("dash_no_sessions")}</div>`;
+  $("dashAccLbl").innerHTML = recent.map(s=>`<div>${new Date(s.date).getDate()}/${new Date(s.date).getMonth()+1}</div>`).join("");
+  // recent history
+  $("dashHistory").innerHTML = state.sessions.slice(-6).reverse().map(s=>`
+    <div class="rowitem"><span>${new Date(s.date).toLocaleDateString()} ${new Date(s.date).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>
+    <span class="muted">${s.total} ${t("lbl_words")} · ${s.acc}% · ${Math.max(1,Math.round(s.durationMs/60000))} ${t("lbl_min")}</span></div>`).join("")
+    || `<div class="muted small">${t("dash_hist_empty")}</div>`;
+}
+
+/* ============================ SETTINGS & THEME =========================== */
+function applySettings(){
+  const s = state.settings;
+  LANG = s.lang || "vi";
+  const theme = s.theme==="auto"
+    ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light") : s.theme;
+  document.documentElement.dataset.theme = theme;
+  $("themeBtn").textContent = theme==="dark"?"☀️":"🌙";
+  document.documentElement.style.setProperty("--ui", s.uiScale);
+  document.documentElement.style.setProperty("--charscale", s.charScale);
+  $("s_lang").value = LANG;
+  $("s_theme").value=s.theme; $("s_ui").value=s.uiScale; $("s_char").value=s.charScale;
+  $("s_sound").value=s.sound?"1":"0"; $("s_auto").value=s.autoAutofill?"1":"0";
+  $("s_rate").value=s.ttsRate; $("s_endpoint").value=s.endpoint; $("s_email").value=s.mmEmail;
+  $("uiScaleVal").textContent = Math.round(s.uiScale*100)+"%";
+  $("charScaleVal").textContent = Math.round(s.charScale*100)+"%";
+  applyLangStatic(); // re-translate all static UI text
+}
+function bindSettings(){
+  $("s_lang").onchange = e=>{ state.settings.lang=e.target.value; save(); applySettings(); renderAll(); };
+  $("langBtn").onclick = ()=>{ state.settings.lang = (state.settings.lang==="vi"?"en":"vi"); save(); applySettings(); renderAll(); };
+  $("s_theme").onchange = e=>{ state.settings.theme=e.target.value; save(); applySettings(); };
+  $("s_ui").oninput = e=>{ state.settings.uiScale=+e.target.value; save(); applySettings(); };
+  $("s_char").oninput = e=>{ state.settings.charScale=+e.target.value; save(); applySettings(); };
+  $("s_sound").onchange = e=>{ state.settings.sound=e.target.value==="1"; save(); };
+  $("s_auto").onchange = e=>{ state.settings.autoAutofill=e.target.value==="1"; save(); };
+  $("s_rate").oninput = e=>{ state.settings.ttsRate=+e.target.value; save(); };
+  $("s_endpoint").onchange = e=>{ state.settings.endpoint=e.target.value.trim(); save(); };
+  $("s_email").onchange = e=>{ state.settings.mmEmail=e.target.value.trim(); save(); };
+  $("themeBtn").onclick = ()=>{
+    const cur = document.documentElement.dataset.theme;
+    state.settings.theme = cur==="dark"?"light":"dark"; save(); applySettings();
+  };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", ()=>{ if(state.settings.theme==="auto") applySettings(); });
+}
+
+/* ========================= NAVIGATION & SHORTCUTS ======================= */
+function showView(name){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===name));
+  $("view-"+name).classList.add("active");
+  if(name==="dashboard") renderDashboard();
+  if(name==="dict") renderDict();
+  if(name==="review") renderReview();
+  if(name==="practice" && !sess) renderPracticeSetup();
+  window.scrollTo({top:0});
+}
+document.querySelectorAll("#nav button").forEach(b=> b.onclick=()=>showView(b.dataset.view));
+document.querySelectorAll("#p_modeChips button").forEach(b=> b.onclick=()=>{
+  document.querySelectorAll("#p_modeChips button").forEach(x=>x.classList.remove("sel"));
+  b.classList.add("sel");
+});
+document.addEventListener("keydown", e=>{
+  if(e.target.matches("input,textarea,select")) return;
+  if(e.key==="Escape"){ closeModal(); return; }
+  if(!sess || $("practiceSession").style.display==="none") return;
+  const k = e.key.toLowerCase();
+  const rateMap = {"1":"forgot","2":"incorrect","3":"almost","4":"hard","5":"easy"};
+  if(rateMap[k]){
+    const btn = document.querySelector(`[data-rate="${rateMap[k]}"]`);
+    if(btn && !btn.disabled){ btn.click(); e.preventDefault(); } return;
+  }
+  if(k==="h" && $("hintBtn")){ giveHint(); e.preventDefault(); }
+  else if(k==="u" && ui?.canvas){ ui.canvas.undo(); e.preventDefault(); }
+  else if(k==="c" && ui?.canvas){ ui.canvas.clear(); e.preventDefault(); }
+  else if(k==="p"){ const it=sess.queue[sess.idx]; const en=state.entries[it?.eid]; if(en && it.kind!=="recall") speak(en.simp); }
+  else if(k===" "){
+    const sc = ui?.strokeChars?.[0]; const pb = $("playBtn");
+    if(sc && pb){ scToggle(sc, pb); e.preventDefault(); }
+  }
+  else if(k==="arrowleft"){ const sc=ui?.strokeChars?.[0]; if(sc&&$("prevBtn")){ sc.prev(); $("playBtn").textContent=t("btn_play"); e.preventDefault(); } }
+  else if(k==="arrowright"){ const sc=ui?.strokeChars?.[0]; if(sc&&$("nextBtn")){ sc.next(); $("playBtn").textContent=t("btn_play"); e.preventDefault(); } }
+  else if(e.key==="Enter"){
+    const it = sess.queue[sess.idx];
+    if(it?.kind==="recall" && document.querySelector('[onclick="submitRecall()"]')) submitRecall();
+    else if(document.querySelector('[onclick="guidedNext()"]')) guidedNext();
+    e.preventDefault();
+  }
+});
+
+/* ============================== FORM WIRING ============================== */
+function bindAddForm(){
+  AF_FIELDS.forEach(n=>{
+    fieldEl(n).addEventListener("input", ()=>{
+      editedFields.add(n); autoFields.delete(n); markSrc(n); checkSaveReady();
+    });
+  });
+  $("f_simp").addEventListener("input", ()=>{
+    checkSaveReady();
+    if(!state.settings.autoAutofill) return;
+    clearTimeout(afTimer);
+    const w = $("f_simp").value.trim();
+    if(hanChars(w).length && w!==afLoadedFor)
+      afTimer = setTimeout(()=>runAutofill(false), 700); // debounce ~700 ms
+  });
+  ["f_pinyin","f_vi","f_en"].forEach(id=> $(id).addEventListener("input", checkSaveReady));
+  $("csvFile").addEventListener("change", e=>{ if(e.target.files[0]) importCSVFile(e.target.files[0]); e.target.value=""; });
+  $("jsonFile").addEventListener("change", e=>{ if(e.target.files[0]) importJSONFile(e.target.files[0]); e.target.value=""; });
+  $("dictSearch").addEventListener("input", renderDict);
+  ["dictDeck","dictStatus","dictSort"].forEach(id=> $(id).addEventListener("change", renderDict));
+  $("p_deck").addEventListener("change", renderPracticeSetup);
+}
+function renderAll(){
+  renderDeckSelects();
+  const active = document.querySelector(".view.active")?.id.replace("view-","") || "dashboard";
+  if(active==="dashboard") renderDashboard();
+  if(active==="dict") renderDict();
+  if(active==="review") renderReview();
+  if(active==="practice" && !sess) renderPracticeSetup();
+}
+
+/* ====================== HUB ACCOUNT + CLOUD SYNC ========================
+   Hub version: students sign in with their Learning Ecology account and the
+   personal dictionary, SRS state, decks, stats and session summaries are
+   mirrored to Supabase (hanzi_words + hanzi_profile, migration30) so data
+   follows the account across devices. localStorage stays the offline
+   mirror: the app keeps working offline and pushes when back online.
+   Sync model: after each save() a 4-second timer diffs every entry against
+   the last synced snapshot — changed entries are upserted (newest edit
+   wins across devices, by up_ms), vanished entries are deleted in the
+   cloud (queued while offline). */
+let hubUid = null;
+const cloudChip = document.getElementById("cloudChip");
+function chip(txt, tip){ if(cloudChip){ cloudChip.textContent = txt; if(tip) cloudChip.title = tip; } }
+async function requireLogin(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.href = "login.html"; return false; }
+  hubUid = session.user.id;
+  try{
+    const { data:p } = await sb.from("profiles")
+      .select("full_name, suspended, active_session, multi_device").eq("id", hubUid).single();
+    if(p && p.suspended){ location.href = "login.html"; return false; }
+    const device = localStorage.getItem("hub_device");
+    if(p && p.active_session && !p.multi_device && device && p.active_session !== device){
+      location.href = "login.html?kicked=1"; return false;
+    }
+  }catch(e){}
+  LS_KEY = "hanziApp.v1." + hubUid.slice(0,8);   // per-account slot on shared devices
+  return true;
+}
+function adoptLegacyLocal(){
+  /* one-time: data saved before the hub integration (anonymous key) becomes
+     this account's data instead of silently disappearing */
+  try{
+    if(!localStorage.getItem(LS_KEY) && localStorage.getItem("hanziApp.v1")){
+      localStorage.setItem(LS_KEY, localStorage.getItem("hanziApp.v1"));
+      localStorage.removeItem("hanziApp.v1");
+    }
+  }catch(e){}
+}
+let SNAP = {};            // entry id -> JSON of the last version we synced
+let SNAP_PROF = "";
+const pendKey = ()=> LS_KEY + ".pend";
+function pend(){ try{ return JSON.parse(localStorage.getItem(pendKey())) || {del:[]}; }catch(e){ return {del:[]}; } }
+function setPend(p){ try{ localStorage.setItem(pendKey(), JSON.stringify(p)); }catch(e){} }
+function stripSync(e){ const c = {...e}; delete c.psh; return c; }
+function profBlob(){ return { decks: state.decks, stats: state.stats, sessions: state.sessions.slice(-300) }; }
+async function pullCloud(){
+  chip("☁ ⏳","Đang tải dữ liệu tài khoản…");
+  try{
+    const [w, p] = await Promise.all([
+      sb.from("hanzi_words").select("id, data, up_ms").eq("user_id", hubUid),
+      sb.from("hanzi_profile").select("decks, stats, sessions").eq("user_id", hubUid).maybeSingle()
+    ]);
+    if(w.error) throw w.error;
+    const pd = pend();
+    for(const row of (w.data||[])){
+      if(pd.del.includes(row.id)) continue;               // deleted here while offline
+      const s = row.data || {}; s.up = Number(row.up_ms)||0; s.psh = true;
+      const l = state.entries[row.id];
+      if(!l || (s.up||0) >= (l.up||0)) state.entries[row.id] = s;
+    }
+    const serverIds = new Set((w.data||[]).map(r=>r.id));
+    for(const id of Object.keys(state.entries)){          // pushed before but gone on the server → deleted on another device
+      if(!serverIds.has(id) && state.entries[id].psh && !pd.del.includes(id)) delete state.entries[id];
+    }
+    state.order = state.order.filter(i=>state.entries[i]);
+    const known = new Set(state.order);
+    Object.keys(state.entries).filter(i=>!known.has(i))
+      .sort((a,b)=>(state.entries[a].dateAdded||0)-(state.entries[b].dateAdded||0))
+      .forEach(i=>state.order.push(i));
+    if(p && p.data){
+      state.decks = [...new Set([...(p.data.decks||[]), ...state.decks])];
+      if(p.data.stats) state.stats.charsWritten = Math.max(state.stats.charsWritten||0, p.data.stats.charsWritten||0);
+      const seen = new Set(state.sessions.map(s=>JSON.stringify(s)));
+      for(const s of (p.data.sessions||[])) if(!seen.has(JSON.stringify(s))) state.sessions.push(s);
+      state.sessions.sort((a,b)=>(a.date||0)-(b.date||0));
+    }
+    if((w.data||[]).length || (p && p.data)) state.samplesSeeded = true;   // an account with cloud data never re-seeds samples
+    saveState();
+    SNAP = {}; for(const id in state.entries) SNAP[id] = JSON.stringify(stripSync(state.entries[id]));
+    SNAP_PROF = "";                                       // force one profile upsert on first sync
+    for(const id of pd.del.splice(0)){ try{ await sb.from("hanzi_words").delete().eq("user_id",hubUid).eq("id",id); }catch(e){} }
+    setPend(pd);
+    await syncNow();                                      // push local-only words from before the integration
+  }catch(e){ chip("☁ ⚠","Ngoại tuyến — dữ liệu lưu trên máy, sẽ tự đồng bộ khi có mạng"); }
+}
+let syncT = null, syncing = false;
+function scheduleSync(){ if(!hubUid) return; clearTimeout(syncT); syncT = setTimeout(syncNow, 4000); }
+async function syncNow(){
+  if(!hubUid || syncing) return;
+  syncing = true;
+  try{
+    const pd = pend();
+    for(const id of Object.keys(SNAP)){                   // deletions
+      if(!state.entries[id]){
+        delete SNAP[id];
+        try{
+          const { error } = await sb.from("hanzi_words").delete().eq("user_id",hubUid).eq("id",id);
+          if(error) throw error;
+        }catch(e){ if(!pd.del.includes(id)) pd.del.push(id); }
+      }
+    }
+    const rows = [];                                      // additions + edits
+    for(const id of Object.keys(state.entries)){
+      const e = state.entries[id];
+      if(SNAP[id] !== JSON.stringify(stripSync(e))){
+        e.up = Date.now();
+        rows.push({ user_id: hubUid, id: id, data: stripSync(e), up_ms: e.up });
+      }
+    }
+    if(rows.length){
+      const { error } = await sb.from("hanzi_words").upsert(rows);
+      if(error) throw error;
+      rows.forEach(r=>{ state.entries[r.id].psh = true; SNAP[r.id] = JSON.stringify(stripSync(state.entries[r.id])); });
+      saveState();
+    }
+    const pj = JSON.stringify(profBlob());
+    if(pj !== SNAP_PROF){
+      const { error } = await sb.from("hanzi_profile")
+        .upsert({ user_id: hubUid, ...profBlob(), updated_at: new Date().toISOString() });
+      if(error) throw error;
+      SNAP_PROF = pj;
+    }
+    setPend(pd);
+    chip("☁ ✓","Đã đồng bộ với tài khoản của bạn");
+  }catch(e){ chip("☁ ⚠","Chưa đồng bộ được — sẽ tự thử lại khi có mạng"); }
+  syncing = false;
+}
+function startSyncLoop(){
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden"){ clearTimeout(syncT); syncNow(); } });
+  window.addEventListener("online", ()=>syncNow());
+  setInterval(()=>{ if(navigator.onLine && !document.hidden) syncNow(); }, 90000);
+}
+
+/* ================================= INIT ================================= */
+(async function boot(){
+  if(!await requireLogin()) return;
+  adoptLegacyLocal();
+  loadState();
+  await pullCloud();
+  seedSamples();
+  applySettings();
+  bindSettings();
+  bindAddForm();
+  renderDeckSelects();
+  showView("dashboard");
+  startSyncLoop();
+  if(navigator.onLine) allEntries().slice(0,80).forEach(e=> hanChars(e.simp).forEach(ch=> getCharData(ch).catch(()=>{})));
+})();
+</script>
+</body>
+</html>

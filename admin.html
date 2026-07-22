@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administrator — Learning Ecology</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    /* apply dark mode before first paint: saved choice, else device preference */
+    try { var __t = localStorage.getItem("hub_theme");
+      if (__t === "dark" || (!__t && matchMedia("(prefers-color-scheme: dark)").matches))
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#17263e" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Learning Ecology" />
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand"><img src="icons/icon-192.png" alt="" />Learning Ecology</span>
+    <div style="display:flex; align-items:center; gap:0.4rem;">
+      <span id="bell-slot"></span>
+      <button class="ghost" id="lang-btn"></button>
+      <span class="who" id="who"></span>
+      <button class="ghost" id="signout"></button>
+    </div>
+  </header>
+
+  <main class="container" id="app"></main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
+  <script src="config.js"></script>
+  <script src="ui.js"></script>
+  <script>
+    const { t2, toast, confirmDialog, promptDialog, skeleton, csv, icon,
+            refreshIcons, wireLangButton, rerender, membership, memberBadge } = window.UI;
+    const isPremRow = s => ["premium", "teacher-prem"].includes(membership(s).key);
+    const app = document.getElementById("app");
+    const who = document.getElementById("who");
+    let user = null, myOrg = null;
+    let tab = localStorage.getItem("hub_admin_tab") || "overview";
+    if (tab === "people") tab = "teachers";
+
+    document.getElementById("signout").textContent = t2("sign_out");
+    document.getElementById("signout").addEventListener("click", async () => {
+      await sb.auth.signOut();
+      window.location.href = "login.html";
+    });
+    wireLangButton(document.getElementById("lang-btn"));
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c =>
+        ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+    }
+    const fmtTime = s => !s ? "—" : (s < 60 ? "<1 min" : Math.round(s / 60) + " min");
+    const nameOf = p => p?.full_name || p?.email || "—";
+    const dstr = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    const addDaysStr = (base, n) => { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return dstr(d); };
+
+    async function callFn(payload) {
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(SUPABASE_URL + "/functions/v1/manage-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json",
+                   Authorization: "Bearer " + session.access_token,
+                   apikey: SUPABASE_ANON_KEY },
+        body: JSON.stringify(payload)
+      });
+      const out = await res.json();
+      if (!res.ok || out.error) throw new Error(out.error || "Request failed");
+      return out;
+    }
+
+    async function start() {
+      app.innerHTML = skeleton(3);
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = "login.html"; return; }
+      user = session.user;
+      const { data: me } = await sb.from("profiles")
+        .select("full_name, role, org_id").eq("id", user.id).single();
+      if (me?.role !== "admin") { window.location.href = "dashboard.html"; return; }
+      myOrg = me.org_id;
+      who.textContent = me.full_name || user.email;
+      window.UI.initBell(document.getElementById("bell-slot"));
+      render();
+    }
+
+    async function render() {
+      // RLS limits every query to this admin's own organization.
+      const [{ data: orgRows }, { data: licenses }, { data: courses },
+             { data: lessons }, { data: people }, { data: tcs },
+             { data: enrollments }, { data: prog }, { data: activity },
+             { data: anns }, { data: asgns }, { data: subs }] = await Promise.all([
+        sb.from("organizations").select("*"),
+        sb.from("course_licenses").select("*"),
+        sb.from("courses").select("id, title, color").order("sort_order"),
+        sb.from("lessons").select("id, title, course_id"),
+        sb.from("profiles")
+          .select("id, full_name, email, role, access_start, access_expires, suspended, plan, premium_until")
+          .order("created_at"),
+        sb.from("teacher_courses").select("teacher_id, course_id"),
+        sb.from("enrollments").select("id, student_id, course_id, teacher_id, created_at"),
+        sb.from("progress").select("student_id, lesson_id, status, updated_at"),
+        sb.from("lesson_activity").select("student_id, lesson_id, kind, key, value, max_value, updated_at"),
+        sb.from("announcements").select("*").order("created_at", { ascending: false }),
+        sb.from("assignments").select("*"),
+        sb.from("submissions").select("*")
+      ]);
+
+      const org = (orgRows || [])[0];
+      const teachers = (people || []).filter(p => p.role === "teacher");
+      const students = (people || []).filter(p => p.role === "student");
+      const cTitle = id => (courses || []).find(c => c.id === id)?.title || "—";
+      const pById = id => (people || []).find(p => p.id === id);
+      const seatUse = cid => (enrollments || []).filter(e => e.course_id === cid).length;
+
+      const timeBy = {}, doneBy = {}, lastBy = {};
+      (activity || []).forEach(a => {
+        if (a.kind === "time" && a.key === "total")
+          timeBy[a.student_id] = (timeBy[a.student_id] || 0) + (Number(a.value) || 0);
+        if (a.updated_at && (!lastBy[a.student_id] || a.updated_at > lastBy[a.student_id]))
+          lastBy[a.student_id] = a.updated_at;
+      });
+      (prog || []).forEach(p => {
+        if (p.status === "completed") doneBy[p.student_id] = (doneBy[p.student_id] || 0) + 1;
+        if (p.updated_at && (!lastBy[p.student_id] || p.updated_at > lastBy[p.student_id]))
+          lastBy[p.student_id] = p.updated_at;
+      });
+
+      const stat = (k, v, sub) =>
+        `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>`;
+      const teacherOptions = teachers.map(p => `<option value="${p.id}">${esc(nameOf(p))}</option>`).join("");
+      const studentOptions = students.map(p => `<option value="${p.id}">${esc(nameOf(p))}</option>`).join("");
+      const licCourseOptions = (licenses || []).map(l =>
+        `<option value="${l.course_id}">${esc(cTitle(l.course_id))}</option>`).join("");
+
+      // ---- attention banner ----
+      const today = new Date(); today.setHours(0,0,0,0);
+      const expSoon = (licenses || []).filter(l => {
+        if (!l.expires_on) return false;
+        const d = Math.round((new Date(l.expires_on) - today) / 86400000);
+        return d >= 0 && d <= 30;
+      });
+      const seatWarn = (licenses || []).filter(l =>
+        l.seats && seatUse(l.course_id) >= l.seats * 0.8);
+      const attention = (expSoon.length || seatWarn.length) ? `
+        <div class="attention">${icon("alert-triangle")} <b>${t2("needs_attention")}</b>
+          <ul>
+            ${expSoon.map(l => `<li>${esc(cTitle(l.course_id))} — ${t2("valid_until")} ${esc(l.expires_on)} (${t2("expiring_soon")})</li>`).join("")}
+            ${seatWarn.map(l => `<li>${esc(cTitle(l.course_id))} — ${seatUse(l.course_id)}/${l.seats} ${t2("seats_used")}</li>`).join("")}
+          </ul>
+        </div>` : "";
+
+      const seatBar = l => {
+        if (!l.seats) return "";
+        const pct = Math.min(100, Math.round(seatUse(l.course_id) / l.seats * 100));
+        const cls = pct >= 100 ? "full" : (pct >= 80 ? "warn" : "");
+        return `<div class="seatbar ${cls}"><span style="width:${pct}%;"></span></div>`;
+      };
+
+      const accPill = s => {
+        const expired = s.access_expires && s.access_expires < dstr(new Date());
+        return s.suspended ? `<span class="pill off">${t2("suspended")}</span>`
+          : expired ? `<span class="pill bad">${t2("expired")}</span>`
+          : !s.access_expires ? `<span class="pill done">${t2("unlimited")}</span>`
+          : `<span class="pill done">${t2("until")} ${esc(s.access_expires)}</span>`;
+      };
+
+      // ---- report computations ----
+      const bestScoresIn = (ls, sid) => {
+        const rows = (activity || []).filter(a =>
+          a.kind === "activity" && a.key !== "opened" && Number(a.max_value) > 1
+          && ls.some(x => x.id === a.lesson_id)
+          && (sid == null || a.student_id === sid));
+        return rows.length
+          ? Math.round(rows.reduce((s, a) => s + (Number(a.value) || 0) / Number(a.max_value), 0) / rows.length * 100) + "%"
+          : "—";
+      };
+      const courseRows = (licenses || []).map(l => {
+        const ls = (lessons || []).filter(x => x.course_id === l.course_id);
+        const enr = (enrollments || []).filter(e => e.course_id === l.course_id);
+        const compl = enr.length && ls.length
+          ? Math.round(enr.reduce((s, e) => s + (prog || []).filter(p =>
+              p.student_id === e.student_id && p.status === "completed"
+              && ls.some(x => x.id === p.lesson_id)).length / ls.length, 0) / enr.length * 100)
+          : 0;
+        const time = (activity || []).filter(a => a.kind === "time" && a.key === "total"
+          && ls.some(x => x.id === a.lesson_id)).reduce((s, a) => s + (Number(a.value) || 0), 0);
+        return { title: cTitle(l.course_id), enrolled: enr.length, compl,
+                 score: bestScoresIn(ls, null), time };
+      });
+      const teacherRows = teachers.map(tc => {
+        const stuIds = new Set((enrollments || []).filter(e => e.teacher_id === tc.id).map(e => e.student_id));
+        return { name: nameOf(tc), students: stuIds.size,
+                 compl: (prog || []).filter(p => stuIds.has(p.student_id) && p.status === "completed").length,
+                 time: [...stuIds].reduce((s, id) => s + (timeBy[id] || 0), 0) };
+      });
+
+      const tabs = [["overview", t2("overview")], ["people", t2("people")],
+                    ["enroll", t2("enrollments")], ["reports", t2("reports")],
+                    ["announce", t2("announcements")]];
+
+      app.innerHTML = `
+        <p class="eyebrow">${t2("org_admin")}</p>
+        <h1>${esc(org?.name || "—")}</h1>
+
+        <div class="tabpane" data-tab="overview">
+          ${attention}
+          <div class="stat-grid">
+            ${stat(t2("teachers"), teachers.length)}
+            ${stat(t2("students"), students.length)}
+            ${stat(t2("licensed_courses"), (licenses || []).length)}
+            ${stat(t2("lessons_completed"), (prog || []).filter(p => p.status === "completed").length)}
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>${icon("book-open", 18)} ${t2("our_licenses")}</h2></div>
+            ${(licenses || []).map(l => `
+              <div class="lesson">
+                <span class="icon">${icon("book-open")}</span>
+                <div class="meta">
+                  <div class="title">${esc(cTitle(l.course_id))}</div>
+                  <span class="kind">${seatUse(l.course_id)}${l.seats ? " / " + l.seats : ""} ${t2("seats_used")} ·
+                    ${l.expires_on ? t2("valid_until") + " " + esc(l.expires_on) : t2("no_expiry")}</span>
+                  ${seatBar(l)}
+                </div>
+              </div>`).join("") || `<p class="empty">${t2("no_licenses")}</p>`}
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>${icon("palette", 18)} ${t2("branding")}</h2></div>
+            <p class="kind" style="margin:0 0 0.4rem;">${t2("brand_hint")}</p>
+            <div class="brand-swatches">${window.UI.BRAND_PRESETS.map(c =>
+              `<button data-c="${c}" class="${(org?.brand_color || "") === c ? "on" : ""}" style="background:${c};" title="${c}"></button>`).join("")}</div>
+            <div class="form-row">
+              <div class="field" style="max-width:110px;"><label>&nbsp;</label>
+                <input type="color" id="br-color" value="${esc(org?.brand_color || "#1e4f8f")}" style="height:42px; padding:0.2rem;" /></div>
+              <button id="br-save">${t2("save")}</button>
+              <button class="ghost" id="br-reset">${t2("reset_default")}</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabpane" data-tab="teachers">
+          <div class="card">
+            <div class="card-head"><h2>${icon("user-plus", 18)} ${t2("create_account")}</h2></div>
+            <div class="form-row">
+              <div class="field"><label>${t2("email")}</label><input id="nu-email" placeholder="name@example.com" /></div>
+              <div class="field" style="max-width:170px;"><label>${t2("password")}</label><input id="nu-pass" placeholder="${t2("pw_min6")}" /></div>
+              <div class="field"><label>${t2("full_name_opt")}</label><input id="nu-name" /></div>
+              <div class="field" style="max-width:150px;"><label>${t2("role")}</label>
+                <select id="nu-role">
+                  <option value="teacher">${t2("teacher")}</option>
+                  <option value="student">${t2("student")}</option>
+                </select></div>
+              <button id="nu-add">${t2("create")}</button>
+            </div>
+            <label style="font-size:0.85rem; color:var(--muted); cursor:pointer; display:block; margin-top:0.5rem;">
+              <input type="checkbox" id="nu-invite" /> ${t2("invite_instead")}
+            </label>
+            <p class="kind" id="nu-invite-note" style="display:none; margin:0.3rem 0 0;">${t2("invite_note")}</p>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>${icon("graduation-cap", 18)} ${t2("teachers")}</h2></div>
+            ${teachers.length ? `
+            <table class="stackable">
+              <thead><tr><th>${t2("teacher")}</th><th>${t2("email")}</th><th>${t2("students")}</th><th>${t2("actions")}</th></tr></thead>
+              <tbody>${teachers.map(p => `
+                <tr>
+                  <td data-th="${t2("teacher")}">${esc(nameOf(p))}</td>
+                  <td data-th="${t2("email")}">${esc(p.email || "—")}</td>
+                  <td data-th="${t2("students")}">${new Set((enrollments || []).filter(e => e.teacher_id === p.id).map(e => e.student_id)).size}</td>
+                  <td style="white-space:nowrap;">
+                    <button class="ghost u-reset" data-id="${p.id}" data-name="${esc(nameOf(p))}">${icon("key-round")} ${t2("reset_pw")}</button>
+                    <button class="ghost u-del" data-id="${p.id}" data-name="${esc(nameOf(p))}"
+                            style="color:var(--danger); border-color:var(--danger);">${icon("trash-2")} ${t2("delete_")}</button>
+                  </td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<p class="empty">${t2("no_teachers")}</p>`}
+
+            <div class="form-row" style="margin-top:1rem;">
+              <div class="field"><label>${t2("assign_title")}</label>
+                <select id="tc-teacher">${teacherOptions || `<option value="">${t2("no_teachers")}</option>`}</select></div>
+              <div class="field"><label>${t2("course")}</label>
+                <select id="tc-course">${licCourseOptions || `<option value="">${t2("no_courses")}</option>`}</select></div>
+              <button id="tc-add">${t2("assign")}</button>
+            </div>
+            ${(tcs || []).length ? `
+            <table class="stackable" style="margin-top:0.75rem;">
+              <thead><tr><th>${t2("teacher")}</th><th>${t2("course")}</th><th></th></tr></thead>
+              <tbody>${(tcs || []).map(t => `
+                <tr>
+                  <td data-th="${t2("teacher")}">${esc(nameOf(pById(t.teacher_id)))}</td>
+                  <td data-th="${t2("course")}">${esc(cTitle(t.course_id))}</td>
+                  <td><button class="ghost tc-remove" data-t="${t.teacher_id}" data-c="${t.course_id}">${t2("remove")}</button></td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<p class="empty" style="margin-top:0.75rem;">${t2("no_assignments")}</p>`}
+          </div>
+
+        </div>
+
+        <div class="tabpane" data-tab="students">
+          <div class="card">
+            <div class="card-head">
+              <h2>${icon("users", 18)} ${t2("students_access")}</h2>
+              <button class="ghost" id="stu-csv">${icon("download")} ${t2("export_csv")}</button>
+            </div>
+            ${students.length ? `
+            <table class="stackable">
+              <thead><tr><th>${t2("student")}</th><th>${t2("access")}</th><th>${t2("completed")}</th>
+                <th>${t2("study_time")}</th><th>${t2("last_active")}</th><th>${t2("actions")}</th></tr></thead>
+              <tbody>${students.map(s => `
+                <tr class="${isPremRow(s) ? "row-premium" : ""}">
+                  <td data-th="${t2("student")}">${esc(nameOf(s))} ${memberBadge(s)}<div class="kind">${esc(s.email || "")}</div></td>
+                  <td data-th="${t2("access")}">${accPill(s)}${s.plan === "premium" && s.premium_until ? ` <span class="kind">👑 → ${esc(s.premium_until)}</span>` : ""}</td>
+                  <td data-th="${t2("completed")}">${doneBy[s.id] || 0}</td>
+                  <td data-th="${t2("study_time")}">${fmtTime(timeBy[s.id] || 0)}</td>
+                  <td data-th="${t2("last_active")}">${lastBy[s.id] ? new Date(lastBy[s.id]).toLocaleDateString() : t2("never")}</td>
+                  <td style="white-space:nowrap;">
+                    <button class="ghost st-ext" data-id="${s.id}" data-d="30">+30d</button>
+                    <button class="ghost st-ext" data-id="${s.id}" data-d="90">+90d</button>
+                    <button class="ghost st-unlim" data-id="${s.id}">∞</button>
+                    <button class="ghost st-susp" data-id="${s.id}"
+                      ${s.suspended ? "" : 'style="color:var(--danger); border-color:var(--danger);"'}>
+                      ${s.suspended ? t2("reactivate") : t2("suspend")}</button>
+                    <button class="ghost pm-tgl" data-id="${s.id}" data-p="${s.plan === "premium" ? "free" : "premium"}">${s.plan === "premium" ? "→ " + t2("free_plan") : "👑"}</button>
+                    <button class="ghost u-reset" data-id="${s.id}" data-name="${esc(nameOf(s))}">${icon("key-round")}</button>
+                    <button class="ghost u-del" data-id="${s.id}" data-name="${esc(nameOf(s))}"
+                            style="color:var(--danger); border-color:var(--danger);">${icon("trash-2")}</button>
+                  </td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<p class="empty">${t2("no_students")}</p>`}
+          </div>
+        </div>
+
+        <div class="tabpane" data-tab="enroll">
+          <div class="card">
+            <div class="card-head">
+              <h2>${icon("book-plus", 18)} ${t2("enroll_title")}</h2>
+              <button class="ghost" id="enr-csv">${icon("download")} ${t2("export_csv")}</button>
+            </div>
+            <div class="form-row">
+              <div class="field"><label>${t2("student")}</label>
+                <select id="en-student">${studentOptions || `<option value="">${t2("no_students")}</option>`}</select></div>
+              <div class="field"><label>${t2("course")}</label>
+                <select id="en-course">${licCourseOptions || `<option value="">${t2("no_courses")}</option>`}</select></div>
+              <div class="field"><label>${t2("their_teacher")}</label>
+                <select id="en-teacher">${teacherOptions || `<option value="">${t2("no_teachers")}</option>`}</select></div>
+              <button id="en-add">${t2("enroll")}</button>
+            </div>
+            ${(enrollments || []).length ? `
+            <table class="stackable" style="margin-top:0.75rem;">
+              <thead><tr><th>${t2("student")}</th><th>${t2("course")}</th><th>${t2("teacher")}</th><th></th></tr></thead>
+              <tbody>${(enrollments || []).map(e => `
+                <tr>
+                  <td data-th="${t2("student")}">${esc(nameOf(pById(e.student_id)))}</td>
+                  <td data-th="${t2("course")}">${esc(cTitle(e.course_id))}</td>
+                  <td data-th="${t2("teacher")}">${esc(nameOf(pById(e.teacher_id)))}</td>
+                  <td><button class="ghost en-remove" data-id="${e.id}">${t2("remove")}</button></td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<p class="empty" style="margin-top:0.75rem;">${t2("no_enrollments")}</p>`}
+          </div>
+        </div>
+
+        <div class="tabpane" data-tab="reports">
+          <div class="card">
+            <div class="card-head"><h2>${icon("bar-chart-3", 18)} ${t2("per_course")}</h2></div>
+            ${courseRows.length ? `
+            <table class="stackable">
+              <thead><tr><th>${t2("course")}</th><th>${t2("students")}</th>
+                <th>${t2("avg_completion")}</th><th>${t2("avg_score")}</th><th>${t2("total_time")}</th></tr></thead>
+              <tbody>${courseRows.map(r => `
+                <tr>
+                  <td data-th="${t2("course")}">${esc(r.title)}</td>
+                  <td data-th="${t2("students")}">${r.enrolled}</td>
+                  <td data-th="${t2("avg_completion")}">
+                    <div class="progress" style="margin:0 0 2px; max-width:140px;"><span style="width:${r.compl}%;"></span></div>${r.compl}%</td>
+                  <td data-th="${t2("avg_score")}">${r.score}</td>
+                  <td data-th="${t2("total_time")}">${fmtTime(r.time)}</td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<p class="empty">${t2("no_data")}</p>`}
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>${icon("graduation-cap", 18)} ${t2("per_teacher")}</h2></div>
+            ${teacherRows.length ? `
+            <table class="stackable">
+              <thead><tr><th>${t2("teacher")}</th><th>${t2("students")}</th>
+                <th>${t2("lessons_completed")}</th><th>${t2("total_time")}</th></tr></thead>
+              <tbody>${teacherRows.map(r => `
+                <tr>
+                  <td data-th="${t2("teacher")}">${esc(r.name)}</td>
+                  <td data-th="${t2("students")}">${r.students}</td>
+                  <td data-th="${t2("lessons_completed")}">${r.compl}</td>
+                  <td data-th="${t2("total_time")}">${fmtTime(r.time)}</td>
+                </tr>`).join("")}</tbody>
+            </table>` : `<p class="empty">${t2("no_teachers")}</p>`}
+          </div>
+
+          <div class="card" id="report-pane">
+            <div class="card-head no-print">
+              <h2>${icon("file-text", 18)} ${t2("report_card")}</h2>
+              <select id="rc-student" style="max-width:240px;">
+                <option value="">${t2("select_student")}</option>${studentOptions}</select>
+              <button class="ghost" id="rc-print">${icon("printer")} ${t2("print")}</button>
+            </div>
+            <div id="rc-body"><p class="empty">${t2("select_student")}</p></div>
+          </div>
+        </div>
+
+        <div class="tabpane" data-tab="announce">
+          <div class="card">
+            <div class="card-head"><h2>${icon("megaphone", 18)} ${t2("announcements")}</h2></div>
+            <div class="form-row">
+              <div class="field"><label>${t2("message")}</label><input id="an-body" /></div>
+              <div class="field" style="max-width:220px;"><label>${t2("send_to")}</label>
+                <select id="an-course"><option value="">${t2("whole_org")}</option>${licCourseOptions}</select></div>
+              <button id="an-add">${t2("post")}</button>
+            </div>
+            ${(anns || []).map(a => `
+              <div class="lesson">
+                <span class="icon">${icon("megaphone")}</span>
+                <div class="meta">
+                  <div class="title" style="font-weight:500;">${esc(String(a.body).replace(/<[^>]*>/g, "").slice(0, 140))}</div>
+                  <span class="kind">${a.course_id ? esc(cTitle(a.course_id)) : t2("whole_org")} ·
+                    ${new Date(a.created_at).toLocaleDateString()}</span>
+                </div>
+                <button class="ghost an-del" data-id="${a.id}"
+                        style="color:var(--danger); border-color:var(--danger);">${t2("delete_")}</button>
+              </div>`).join("") || `<p class="empty">${t2("no_announcements")}</p>`}
+          </div>
+        </div>
+        <footer class="hub-footer">Learning Ecology · Thầy Lê Quốc Thông</footer>`;
+
+      // ---- tabs ----
+      function showTab(k) {
+        tab = k;
+        try { localStorage.setItem("hub_admin_tab", k); } catch (e) {}
+        app.querySelectorAll(".tabpane").forEach(p =>
+          p.classList.toggle("show", p.getAttribute("data-tab") === k));
+        document.querySelectorAll("#subnav .sn-item[data-id]").forEach(b =>
+          b.classList.toggle("on", b.getAttribute("data-id") === k));
+        const lbl = document.querySelector(`#subnav .sn-item[data-id="${k}"] span`);
+        const eb = app.querySelector(".eyebrow");
+        if (eb && lbl) eb.textContent = t2("org_admin") + " / " + lbl.textContent;
+      }
+      window.UI.initNav({
+        items: [
+          { id: "overview", label: t2("overview"), icon: "layout-dashboard", group: t2("dashboard") },
+          { id: "teachers", label: t2("teachers"), icon: "graduation-cap", group: t2("g_people") },
+          { id: "students", label: t2("students"), icon: "users", group: t2("g_people") },
+          { id: "enroll", label: t2("enrollments"), icon: "book-plus", group: t2("g_content") },
+          { id: "reports", label: t2("reports"), icon: "file-text", group: t2("g_analytics") },
+          { id: "announce", label: t2("announcements"), icon: "megaphone", group: t2("g_comm") },
+        ],
+        active: tab,
+        onSelect: showTab,
+        actions: [
+          { label: t2("create_account"), icon: "user-plus",
+            onClick: () => { showTab("teachers"); document.getElementById("nu-email")?.focus(); } },
+          { label: t2("enroll"), icon: "plus",
+            onClick: () => { showTab("enroll"); document.getElementById("en-student")?.focus(); } },
+        ]
+      });
+      showTab(tab);
+
+      // ---- create account ----
+      const inviteCb = document.getElementById("nu-invite");
+      inviteCb.addEventListener("change", () => {
+        document.getElementById("nu-pass").disabled = inviteCb.checked;
+        document.getElementById("nu-invite-note").style.display = inviteCb.checked ? "block" : "none";
+      });
+      document.getElementById("nu-add").addEventListener("click", async () => {
+        const email = document.getElementById("nu-email").value.trim();
+        const password = document.getElementById("nu-pass").value;
+        const full_name = document.getElementById("nu-name").value.trim() || null;
+        const role = document.getElementById("nu-role").value;
+        const invite = inviteCb.checked;
+        if (!email || (!invite && password.length < 6)) { toast(t2("need_email_pw"), "err"); return; }
+        const btn = document.getElementById("nu-add");
+        btn.disabled = true;
+        try {
+          await callFn({ action: "create", email, password, full_name, role,
+                         invite, redirect: new URL("reset.html", location.href).href });
+          toast(invite ? t2("invited_ok") : t2("created_ok"));
+          rerender(render);
+        } catch (err) { toast(t2("err_create") + err.message, "err"); btn.disabled = false; }
+      });
+
+      // ---- teacher-course assignment ----
+      document.getElementById("tc-add").addEventListener("click", async () => {
+        const teacher_id = document.getElementById("tc-teacher").value;
+        const course_id = document.getElementById("tc-course").value;
+        if (!teacher_id || !course_id) { toast(t2("pick_teacher_course"), "err"); return; }
+        const { error } = await sb.from("teacher_courses").insert({ teacher_id, course_id, org_id: myOrg });
+        if (error) {
+          toast(error.code === "23505" ? t2("already_assigned") : t2("err_save") + error.message, "err");
+          return;
+        }
+        toast(t2("assigned_ok"));
+        rerender(render);
+      });
+      app.querySelectorAll(".tc-remove").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({ title: t2("remove_asgn_title"), body: t2("remove_asgn_body"),
+                                   okText: t2("remove"), danger: true })) return;
+        const { error } = await sb.from("teacher_courses").delete()
+          .eq("teacher_id", btn.getAttribute("data-t"))
+          .eq("course_id", btn.getAttribute("data-c"));
+        if (error) { toast(t2("err_delete") + error.message, "err"); return; }
+        toast(t2("removed_ok"));
+        rerender(render);
+      }));
+
+      // ---- enrollments ----
+      document.getElementById("en-add").addEventListener("click", async () => {
+        const student_id = document.getElementById("en-student").value;
+        const course_id = document.getElementById("en-course").value;
+        const teacher_id = document.getElementById("en-teacher").value || null;
+        if (!student_id || !course_id) { toast(t2("pick_student_course"), "err"); return; }
+        const { error } = await sb.from("enrollments").insert({
+          student_id, course_id, teacher_id, org_id: myOrg });
+        if (error) {
+          toast(error.code === "23505" ? t2("already_enrolled")
+            : (error.message.includes("seat limit") ? t2("seat_limit") : t2("err_enroll") + error.message), "err");
+          return;
+        }
+        toast(t2("enrolled_ok"));
+        rerender(render);
+      });
+      app.querySelectorAll(".en-remove").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({ title: t2("remove_enr_title"), body: t2("remove_enr_body"),
+                                   okText: t2("remove"), danger: true })) return;
+        const { error } = await sb.from("enrollments").delete().eq("id", btn.getAttribute("data-id"));
+        if (error) { toast(t2("err_delete") + error.message, "err"); return; }
+        toast(t2("removed_ok"));
+        rerender(render);
+      }));
+
+      // ---- access management ----
+      const patchStudent = async (id, patch, okText) => {
+        const { error } = await sb.from("profiles").update(patch).eq("id", id);
+        if (error) { toast(t2("err_save") + error.message, "err"); return; }
+        toast(okText);
+        rerender(render);
+      };
+      app.querySelectorAll(".st-ext").forEach(btn => btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id"), d = parseInt(btn.getAttribute("data-d"), 10);
+        const s = students.find(x => x.id === id);
+        const today2 = dstr(new Date());
+        const base = (s.access_expires && s.access_expires >= today2) ? s.access_expires : null;
+        patchStudent(id, { access_expires: addDaysStr(base, d),
+                           access_start: s.access_start || today2, suspended: false }, t2("saved_ok"));
+      }));
+      app.querySelectorAll(".st-unlim").forEach(btn => btn.addEventListener("click", () => {
+        patchStudent(btn.getAttribute("data-id"),
+          { access_start: null, access_expires: null, suspended: false }, t2("saved_ok"));
+      }));
+      app.querySelectorAll(".st-susp").forEach(btn => btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        const s = students.find(x => x.id === id);
+        if (!s.suspended && !await confirmDialog({ title: t2("suspend_title"), body: t2("suspend_body"),
+                                                   okText: t2("suspend"), danger: true })) return;
+        patchStudent(id, { suspended: !s.suspended }, t2("saved_ok"));
+      }));
+
+      // ---- premium plan toggle ----
+      app.querySelectorAll(".pm-tgl").forEach(btn => btn.addEventListener("click", () => {
+        patchStudent(btn.getAttribute("data-id"),
+          { plan: btn.getAttribute("data-p"), premium_until: null }, t2("saved_ok"));
+      }));
+
+      // ---- reset password / delete user ----
+      app.querySelectorAll(".u-reset").forEach(btn => btn.addEventListener("click", async () => {
+        const pw = await promptDialog({ title: t2("reset_pw") + " — " + btn.getAttribute("data-name"),
+                                        label: t2("new_password"), placeholder: t2("pw_min6") });
+        if (pw === null) return;
+        if (pw.length < 6) { toast(t2("need_email_pw"), "err"); return; }
+        try {
+          await callFn({ action: "reset-password", user_id: btn.getAttribute("data-id"), new_password: pw });
+          toast(t2("reset_pw_ok"));
+        } catch (err) { toast(t2("err_generic") + err.message, "err"); }
+      }));
+      app.querySelectorAll(".u-del").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({
+          title: t2("del_user_title") + " (" + btn.getAttribute("data-name") + ")",
+          body: t2("del_user_body"), okText: t2("delete_"), danger: true })) return;
+        try {
+          await callFn({ action: "delete", user_id: btn.getAttribute("data-id") });
+          toast(t2("deleted_ok"));
+          rerender(render);
+        } catch (err) { toast(t2("err_delete") + err.message, "err"); }
+      }));
+
+      // ---- announcements ----
+      document.getElementById("an-add").addEventListener("click", async () => {
+        const body = document.getElementById("an-body").value.trim();
+        const course_id = document.getElementById("an-course").value || null;
+        if (!body) { toast(t2("write_message"), "err"); return; }
+        const { error } = await sb.from("announcements").insert({
+          body, course_id, author_id: user.id, org_id: myOrg });
+        if (error) { toast(t2("err_post") + error.message, "err"); return; }
+        toast(t2("posted_ok"));
+        rerender(render);
+      });
+      app.querySelectorAll(".an-del").forEach(btn => btn.addEventListener("click", async () => {
+        if (!await confirmDialog({ title: t2("del_ann_title"), okText: t2("delete_"), danger: true })) return;
+        const { error } = await sb.from("announcements").delete().eq("id", btn.getAttribute("data-id"));
+        if (error) { toast(t2("err_delete") + error.message, "err"); return; }
+        toast(t2("deleted_ok"));
+        rerender(render);
+      }));
+
+      // ---- CSV exports ----
+      document.getElementById("stu-csv")?.addEventListener("click", () =>
+        csv("students.csv", students.map(s => ({
+          name: nameOf(s), email: s.email || "",
+          membership: membership(s).label,
+          plan: s.plan || "free", premium_until: s.premium_until || "",
+          access_expires: s.access_expires || "unlimited",
+          suspended: s.suspended ? "yes" : "no",
+          lessons_completed: doneBy[s.id] || 0,
+          study_minutes: Math.round((timeBy[s.id] || 0) / 60),
+          last_active: lastBy[s.id] ? new Date(lastBy[s.id]).toLocaleDateString() : ""
+        }))));
+      document.getElementById("enr-csv")?.addEventListener("click", () =>
+        csv("enrollments.csv", (enrollments || []).map(e => ({
+          student: nameOf(pById(e.student_id)), course: cTitle(e.course_id),
+          teacher: nameOf(pById(e.teacher_id)),
+          enrolled: e.created_at ? new Date(e.created_at).toLocaleDateString() : ""
+        }))));
+
+      // ---- branding ----
+      if (org?.brand_color) window.UI.applyBrand(org.brand_color);
+      app.querySelectorAll(".brand-swatches button").forEach(b => b.addEventListener("click", () => {
+        document.getElementById("br-color").value = b.getAttribute("data-c");
+      }));
+      document.getElementById("br-save").addEventListener("click", async () => {
+        const brand_color = document.getElementById("br-color").value;
+        const { error } = await sb.from("organizations").update({ brand_color }).eq("id", myOrg);
+        if (error) { toast(t2("err_save") + error.message, "err"); return; }
+        window.UI.applyBrand(brand_color);
+        toast(t2("brand_saved"));
+      });
+      document.getElementById("br-reset").addEventListener("click", async () => {
+        const { error } = await sb.from("organizations").update({ brand_color: null }).eq("id", myOrg);
+        if (error) { toast(t2("err_save") + error.message, "err"); return; }
+        toast(t2("brand_saved"));
+        setTimeout(() => location.reload(), 700);
+      });
+
+      // ---- printable report card ----
+      function renderReportCard(sid) {
+        const box = document.getElementById("rc-body");
+        const s = students.find(x => x.id === sid);
+        if (!s) { box.innerHTML = `<p class="empty">${t2("select_student")}</p>`; return; }
+        const myEnr = (enrollments || []).filter(e => e.student_id === sid);
+        const rows = myEnr.map(e => {
+          const ls = (lessons || []).filter(x => x.course_id === e.course_id);
+          const done = (prog || []).filter(p => p.student_id === sid && p.status === "completed"
+            && ls.some(x => x.id === p.lesson_id)).length;
+          const pct = ls.length ? Math.round(done / ls.length * 100) : 0;
+          return `<tr>
+            <td>${esc(cTitle(e.course_id))}</td>
+            <td>${done} / ${ls.length}</td>
+            <td><div class="progress" style="margin:0 0 2px; max-width:150px;"><span style="width:${pct}%;"></span></div>${pct}%</td>
+            <td>${bestScoresIn(ls, sid)}</td>
+          </tr>`;
+        }).join("");
+        const mySubs = (subs || []).filter(x => x.student_id === sid);
+        const asgnRows = mySubs.map(x => {
+          const a = (asgns || []).find(y => y.id === x.assignment_id);
+          return `<tr>
+            <td>${esc(a?.title || "—")}</td>
+            <td>${esc(cTitle(a?.course_id))}</td>
+            <td>${x.status === "graded" ? (x.grade ?? "—") + (a?.points ? " / " + a.points : "") : t2("submitted")}</td>
+            <td>${esc(x.feedback || "—")}</td>
+          </tr>`;
+        }).join("");
+        box.innerHTML = `
+          <h1 style="font-size:1.3rem; margin:0.2rem 0 0;">${esc(nameOf(s))}</h1>
+          <p class="kind">${esc(org?.name || "")} · ${t2("generated")}: ${new Date().toLocaleDateString()} ·
+            ${t2("total_time")}: ${fmtTime(timeBy[sid] || 0)} ·
+            ${t2("last_active")}: ${lastBy[sid] ? new Date(lastBy[sid]).toLocaleDateString() : t2("never")}</p>
+          <table>
+            <thead><tr><th>${t2("course")}</th><th>${t2("lessons")}</th>
+              <th>${t2("completion")}</th><th>${t2("avg_score")}</th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="4" class="empty">${t2("no_data")}</td></tr>`}</tbody>
+          </table>
+          ${asgnRows ? `
+          <h2 style="font-size:1rem; margin-top:1rem;">${t2("asgn_grades")}</h2>
+          <table>
+            <thead><tr><th>${t2("title_label")}</th><th>${t2("course")}</th>
+              <th>${t2("grade")}</th><th>${t2("feedback")}</th></tr></thead>
+            <tbody>${asgnRows}</tbody>
+          </table>` : ""}`;
+      }
+      document.getElementById("rc-student").addEventListener("change", e => renderReportCard(e.target.value));
+      document.getElementById("rc-print").addEventListener("click", () => {
+        document.body.classList.add("print-report");
+        window.print();
+        setTimeout(() => document.body.classList.remove("print-report"), 600);
+      });
+
+      refreshIcons();
+    }
+
+    start();
+  </script>
+  <script>
+    // PWA: offline shell + installability (needs HTTPS, e.g. GitHub Pages)
+    if ("serviceWorker" in navigator && location.protocol === "https:")
+      navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>
