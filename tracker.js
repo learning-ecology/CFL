@@ -33,7 +33,33 @@
   window.LMS = {
     done(name)             { record("activity", String(name), 1, 1, true); },
     score(name, got, max)  { record("activity", String(name), Number(got) || 0, Number(max) || null, false); },
-    section(name)          { record("section", String(name), 1, null, true); }
+    section(name)          { record("section", String(name), 1, null, true); },
+
+    // Submit a whole test for SERVER-SIDE scoring. The answer key lives in
+    // the database (never in the page), so the browser only sends the
+    // student's answers; the server scores, stores the attempt, and returns
+    // the result (with the correct answers, revealed only AFTER submitting).
+    //   testKey : the id of the test in test_keys, e.g. "hsk1-h10901"
+    //   answers : { "1":"✓", "2":"A", ... }   (1-indexed question → choice)
+    //   meta    : { seconds, started }         (time spent, ISO start time)
+    // Returns the server result object, or { error } (e.g. not signed in).
+    async submitTest(testKey, answers, meta) {
+      if (!sb) return { error: "Chưa tải được kết nối máy chủ. Hãy tải lại trang." };
+      meta = meta || {};
+      try {
+        const { data, error } = await sb.rpc("submit_test_attempt", {
+          p_test_key: String(testKey),
+          p_answers: answers || {},
+          p_seconds: (meta.seconds != null ? Math.round(meta.seconds) : null),
+          p_started: (meta.started || null)
+        });
+        if (error) return { error: error.message || String(error) };
+        // also surface the result in the lesson activity feed
+        try { record("activity", "test:" + String(testKey),
+                     (data && data.correct) || 0, (data && data.total) || null, false); } catch (e) {}
+        return data;
+      } catch (e) { return { error: String((e && e.message) || e) }; }
+    }
   };
 
   function record(kind, key, value, max, onlyOnce) {

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Kết quả bài thi — Learning Ecology</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    try { var __t = localStorage.getItem("hub_theme");
+      if (__t === "dark" || (!__t && matchMedia("(prefers-color-scheme: dark)").matches))
+        document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  </script>
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <style>
+    .rv-wrap { max-width: 860px; margin: 0 auto; padding: clamp(1rem,4vw,2rem) 1.1rem 3rem; }
+    .rv-head { display: flex; align-items: center; gap: .6rem; padding: .8rem 1.1rem; }
+    .rv-head img { width: 30px; height: 30px; border-radius: 7px; }
+    .rv-head b { font-family: var(--serif); }
+    .rv-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem; margin-bottom: 1rem; }
+    .rv-score { font-size: 2.4rem; font-weight: 900; color: var(--accent); font-family: var(--serif); }
+    .rv-meta { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+    .rv-meta b { color: var(--ink); }
+    .rv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: .6rem; margin-top: 1rem; }
+    .rv-tile { border: 1px solid var(--line); border-radius: 10px; padding: .6rem .7rem; text-align: center; }
+    .rv-tile .k { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-family: var(--mono); }
+    .rv-tile .v { font-size: 1.4rem; font-weight: 800; font-family: var(--serif); }
+    .rv-tile.ok .v { color: var(--success); } .rv-tile.bad .v { color: var(--danger); } .rv-tile.none .v { color: var(--muted); }
+    .rv-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .82rem; color: var(--muted); margin: .2rem 0 .8rem; }
+    .rv-dot { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+    .rv-q { border: 1px solid var(--line); border-left-width: 5px; border-radius: 10px; padding: .6rem .8rem; margin-bottom: .5rem; }
+    .rv-q.ok   { border-left-color: var(--success); background: var(--success-bg); }
+    .rv-q.bad  { border-left-color: var(--danger);  background: rgba(164,68,47,0.08); }
+    .rv-q.none { border-left-color: #94a3b8; background: rgba(90,101,119,0.07); }
+    .rv-q .n { font-weight: 800; margin-right: .5rem; }
+    .rv-q .ans { display: inline-flex; gap: .3rem; align-items: center; margin-right: 1rem; font-size: .92rem; }
+    .rv-q .chip { font-weight: 800; padding: .05rem .5rem; border-radius: 7px; border: 1px solid var(--line); background: var(--card); }
+    .rv-q.ok .chip.stu  { background: var(--success); color: #fff; border-color: var(--success); }
+    .rv-q.bad .chip.stu { background: var(--danger);  color: #fff; border-color: var(--danger); }
+    .rv-q .chip.cor { background: var(--success-bg); color: var(--success); border-color: transparent; }
+    .rv-q .expl { display: block; color: var(--muted); font-size: .85rem; margin-top: .3rem; }
+    .rv-empty { text-align: center; color: var(--muted); padding: 3rem 1rem; }
+    @media print { .rv-head a, .rv-print { display: none; } }
+  </style>
+</head>
+<body>
+  <header class="rv-head">
+    <img src="icons/icon-192.png" alt="" />
+    <b>Learning Ecology</b>
+    <span style="flex:1"></span>
+    <button class="ghost rv-print" onclick="window.print()">🖨 In</button>
+    <a class="btn ghost" href="dashboard.html" style="text-decoration:none;">← Bảng điều khiển</a>
+  </header>
+  <div class="rv-wrap" id="rv"><p class="rv-empty">Đang tải…</p></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    function esc(s){ return String(s==null?"":s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+    function fmtDT(s){ if(!s) return "—"; try { return new Date(s).toLocaleString("vi-VN",{dateStyle:"short",timeStyle:"short"}); } catch(e){ return String(s); } }
+    function fmtDur(sec){ if(sec==null) return "—"; const m=Math.floor(sec/60),s=Math.round(sec%60); return m+" phút "+String(s).padStart(2,"0")+"s"; }
+
+    function renderReview(d){
+      const pct = d.max_score ? Math.round(d.score/d.max_score*100) : 0;
+      const rows = (d.detail||[]).map(q=>{
+        const cls = q.student==null ? "none" : (q.ok ? "ok" : "bad");
+        const stu = q.student==null
+          ? `<span class="chip" style="color:var(--muted);">Bỏ trống</span>`
+          : `<span class="chip stu">${esc(q.student)}</span>`;
+        return `<div class="rv-q ${cls}">
+          <span class="n">Câu ${q.n}</span>
+          <span class="ans">Học viên chọn: ${stu}</span>
+          <span class="ans">Đáp án đúng: <span class="chip cor">${esc(q.correct)}</span></span>
+          ${q.explanation ? `<span class="expl">💡 ${esc(q.explanation)}</span>` : ""}
+        </div>`;
+      }).join("");
+      $("rv").innerHTML = `
+        <div class="rv-card">
+          <div style="color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; font-family:var(--mono);">Kết quả bài thi</div>
+          <h1 style="margin:.2rem 0 .1rem; font-size:1.5rem;">${esc(d.test_name)}</h1>
+          <div style="color:var(--muted);">Học viên: <b style="color:var(--ink);">${esc(d.student_name)}</b> · Lần làm thứ ${d.attempt_no}</div>
+          <div style="display:flex; align-items:baseline; gap:.6rem; margin-top:.6rem;">
+            <span class="rv-score">${d.score}/${d.max_score}</span>
+            <span style="color:var(--muted); font-weight:700;">${pct}%</span>
+          </div>
+          <div class="rv-tiles">
+            <div class="rv-tile ok"><div class="k">Đúng</div><div class="v">${d.correct}</div></div>
+            <div class="rv-tile bad"><div class="k">Sai</div><div class="v">${d.incorrect}</div></div>
+            <div class="rv-tile none"><div class="k">Bỏ trống</div><div class="v">${d.unanswered}</div></div>
+            <div class="rv-tile"><div class="k">Tổng câu</div><div class="v">${d.total}</div></div>
+          </div>
+          <div class="rv-meta" style="margin-top:1rem;">
+            <span>🕒 Thời gian làm: <b>${fmtDur(d.seconds_spent)}</b></span>
+            <span>📤 Nộp lúc: <b>${fmtDT(d.submitted_at)}</b></span>
+            ${d.started_at ? `<span>▶️ Bắt đầu: <b>${fmtDT(d.started_at)}</b></span>` : ""}
+          </div>
+        </div>
+        <div class="rv-legend">
+          <span><span class="rv-dot" style="background:var(--success)"></span>Đúng</span>
+          <span><span class="rv-dot" style="background:var(--danger)"></span>Sai</span>
+          <span><span class="rv-dot" style="background:#94a3b8"></span>Bỏ trống</span>
+        </div>
+        ${rows || `<p class="rv-empty">Không có chi tiết câu hỏi.</p>`}`;
+    }
+
+    async function boot(){
+      const token = new URLSearchParams(location.search).get("t");
+      if (!token){ $("rv").innerHTML = `<p class="rv-empty">Thiếu mã kết quả.</p>`; return; }
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session){
+        $("rv").innerHTML = `<div class="rv-empty"><p>🔒 Cần đăng nhập để xem kết quả này.</p>
+          <a class="btn" style="text-decoration:none;" href="login.html?next=${encodeURIComponent(location.pathname+location.search)}">Đăng nhập</a></div>`;
+        return;
+      }
+      const { data, error } = await sb.rpc("get_test_attempt", { p_token: token });
+      if (error){ $("rv").innerHTML = `<p class="rv-empty">Lỗi tải kết quả: ${esc(error.message)}</p>`; return; }
+      if (!data){ $("rv").innerHTML = `<p class="rv-empty">🔒 Không tìm thấy kết quả, hoặc bạn không có quyền xem (chỉ chủ sở hữu, quản trị viên và giáo viên phụ trách được xem).</p>`; return; }
+      renderReview(data);
+    }
+    boot();
+  </script>
+</body>
+</html>
